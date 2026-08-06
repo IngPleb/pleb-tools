@@ -1,0 +1,4 @@
+__pycache__/
+*.py[cod]
+steam-logi-ring-preview.json
+.venv/
