@@ -23,3 +23,7 @@ jobs:
           dotnet-version: "9.0.x"
       - run: dotnet build apps/windows/app-expose/AppExpose.csproj --configuration Release
       - run: dotnet run --project apps/windows/app-expose/AppExpose.Tests/AppExpose.Tests.csproj --configuration Release
+      - run: dotnet build apps/windows/mac-controls/MacControls.csproj --configuration Release
+      - run: dotnet run --project apps/windows/mac-controls/MacControls.Tests/MacControls.Tests.csproj --configuration Release
+      - shell: pwsh
+        run: ./apps/windows/mac-controls/Setup.Tests.ps1
