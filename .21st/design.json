@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "project": {
+    "name": "pleb-tools",
+    "productType": null,
+    "stack": []
+  },
+  "sources": {
+    "tokens": [],
+    "components": [],
+    "assets": [],
+    "instructions": []
+  },
+  "design": {
+    "colorMode": "unknown",
+    "colors": {},
+    "typography": {},
+    "spacing": {},
+    "radius": {},
+    "shadows": {},
+    "motion": {},
+    "density": "unknown"
+  },
+  "components": {
+    "installed": [],
+    "preferredPrimitives": [],
+    "patterns": []
+  },
+  "constraints": {
+    "must": [],
+    "avoid": []
+  },
+  "decisions": [
+    {
+      "id": "app-expose-native-task-view",
+      "scope": "apps/windows/app-expose",
+      "decision": "Use a restrained Windows 11 Task View-like surface with Segoe UI Variable, neutral dark layers, a blue system-style focus ring, and live DWM thumbnails.",
+      "rationale": "The utility should feel native and familiar while preserving clear keyboard focus and avoiding decorative UI that competes with window content."
+    }
+  ],
+  "evidence": [],
+  "generatedAt": "2026-08-06T23:31:58.073Z"
+}
