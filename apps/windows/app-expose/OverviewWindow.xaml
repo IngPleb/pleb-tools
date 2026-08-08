@@ -9,6 +9,10 @@
         Background="Transparent"
         FontFamily="{StaticResource InterfaceFont}"
         Foreground="#FF202020"
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType"
         PreviewKeyDown="OnPreviewKeyDown"
         Deactivated="OnDeactivated">
     <Grid x:Name="Root" ClipToBounds="True">

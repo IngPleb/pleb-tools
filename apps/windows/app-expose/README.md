@@ -38,6 +38,14 @@ row layout over 300 milliseconds, and follows the same path backward when the
 overview closes. The layout scales to the available work area so window contents
 remain readable instead of being held to a small fixed preview height.
 
+Preview title bars use dark translucent chrome with high-contrast white text.
+The overlay declares Per-Monitor V2 DPI awareness, rounds WPF layout to device
+pixels, and sends DWM thumbnails directly to physical-pixel destinations so the
+interface stays crisp across mixed Full HD, high-DPI, and 4K monitors. Enlarging
+a source window beyond its own rendered pixel size can still reveal normal
+compositor upscaling because Windows cannot synthesize detail the source window
+did not render.
+
 App Exposé prefers Windows AppUserModelID so a browser and an installed web app
 do not get mixed together even when they share a process. Older desktop apps
 that publish no application identity fall back to process ownership.

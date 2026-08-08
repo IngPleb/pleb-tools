@@ -107,17 +107,43 @@ public partial class OverviewWindow : Window
                 Text = appWindow.Title,
                 FontSize = 12,
                 FontWeight = FontWeights.Normal,
-                Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(35, 35, 35)),
+                Foreground = System.Windows.Media.Brushes.White,
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 VerticalAlignment = VerticalAlignment.Center,
+                SnapsToDevicePixels = true,
             };
 
-            var titleBar = new Grid { Height = CardHeaderHeight, Margin = new Thickness(8, 0, 8, 0) };
-            titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            titleBar.Children.Add(icon);
-            Grid.SetColumn(title, 1);
-            titleBar.Children.Add(title);
+            var titleShadow = new TextBlock
+            {
+                Text = appWindow.Title,
+                FontSize = 12,
+                FontWeight = FontWeights.Normal,
+                Foreground = new SolidColorBrush(System.Windows.Media.Color.FromArgb(210, 0, 0, 0)),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                VerticalAlignment = VerticalAlignment.Center,
+                SnapsToDevicePixels = true,
+                RenderTransform = new System.Windows.Media.TranslateTransform(0, 1),
+            };
+            var titleText = new Grid { SnapsToDevicePixels = true, UseLayoutRounding = true };
+            titleText.Children.Add(titleShadow);
+            titleText.Children.Add(title);
+
+            var titleContent = new Grid { Margin = new Thickness(8, 0, 8, 0) };
+            titleContent.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            titleContent.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            titleContent.Children.Add(icon);
+            Grid.SetColumn(titleText, 1);
+            titleContent.Children.Add(titleText);
+
+            var titleBar = new Border
+            {
+                Height = CardHeaderHeight,
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(190, 20, 23, 29)),
+                CornerRadius = new CornerRadius(5, 5, 0, 0),
+                Child = titleContent,
+                SnapsToDevicePixels = true,
+                UseLayoutRounding = true,
+            };
 
             var content = new Grid();
             content.RowDefinitions.Add(new RowDefinition { Height = new GridLength(CardHeaderHeight) });
@@ -129,7 +155,7 @@ public partial class OverviewWindow : Window
             var card = new Border
             {
                 CornerRadius = new CornerRadius(8),
-                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(244, 246, 247, 249)),
+                Background = System.Windows.Media.Brushes.Transparent,
                 BorderThickness = new Thickness(3),
                 BorderBrush = System.Windows.Media.Brushes.Transparent,
                 Child = content,

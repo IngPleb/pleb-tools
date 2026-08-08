@@ -7,6 +7,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <!-- The mixed WPF/WinForms tray app requires the WPF process manifest below;
+         WFO0003 assumes a WinForms-only startup path and reports a false conflict. -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
     <AssemblyName>AppExpose</AssemblyName>
     <RootNamespace>PlebTools.AppExpose</RootNamespace>
   </PropertyGroup>
