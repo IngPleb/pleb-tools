@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>MacControls</AssemblyName>
+    <RootNamespace>PlebTools.MacControls</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="MacControls.Tests\**\*.cs" />
+    <EmbeddedResource Remove="MacControls.Tests\**\*" />
+    <None Remove="MacControls.Tests\**\*" />
+  </ItemGroup>
+</Project>

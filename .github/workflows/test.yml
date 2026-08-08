@@ -18,3 +18,12 @@ jobs:
           python-version: "3.13"
       - run: python -m unittest discover -s tests -v
       - run: python -m py_compile scripts/games/steam-logi-ring-guard/steam_logi_ring_guard.py
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+      - run: dotnet build apps/windows/app-expose/AppExpose.csproj --configuration Release
+      - run: dotnet run --project apps/windows/app-expose/AppExpose.Tests/AppExpose.Tests.csproj --configuration Release
+      - run: dotnet build apps/windows/mac-controls/MacControls.csproj --configuration Release
+      - run: dotnet run --project apps/windows/mac-controls/MacControls.Tests/MacControls.Tests.csproj --configuration Release
+      - shell: pwsh
+        run: ./apps/windows/mac-controls/Setup.Tests.ps1

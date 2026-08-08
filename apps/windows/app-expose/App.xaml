@@ -1,0 +1,12 @@
+<Application x:Class="PlebTools.AppExpose.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <FontFamily x:Key="InterfaceFont">Segoe UI Variable Text, Segoe UI</FontFamily>
+        <SolidColorBrush x:Key="TextPrimary" Color="#FFF5F5F5" />
+        <SolidColorBrush x:Key="TextSecondary" Color="#FFB8B8B8" />
+        <SolidColorBrush x:Key="Surface" Color="#E61F1F1F" />
+        <SolidColorBrush x:Key="CardSurface" Color="#F02C2C2C" />
+        <SolidColorBrush x:Key="Selection" Color="#FF60CDFF" />
+    </Application.Resources>
+</Application>
