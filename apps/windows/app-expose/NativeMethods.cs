@@ -100,6 +100,18 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     internal static extern nint GetWindow(nint window, uint command);
 
+    [DllImport("user32.dll")]
+    internal static extern nint SendMessage(nint window, uint message, nint wordParameter, nint longParameter);
+
+    [DllImport("user32.dll", EntryPoint = "GetClassLongPtrW")]
+    internal static extern nint GetClassLongPtr64(nint window, int index);
+
+    [DllImport("user32.dll", EntryPoint = "GetClassLongW")]
+    internal static extern uint GetClassLong32(nint window, int index);
+
+    internal static nint GetClassLongPtr(nint window, int index) =>
+        nint.Size == 8 ? GetClassLongPtr64(window, index) : new nint(unchecked((int)GetClassLong32(window, index)));
+
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     internal static extern nint GetWindowLongPtr64(nint window, int index);
 
@@ -159,8 +171,15 @@ internal static class NativeMethods
     [DllImport("dwmapi.dll")]
     internal static extern int DwmGetWindowAttribute(nint window, int attribute, ref int value, int valueSize);
 
+    [DllImport("dwmapi.dll", EntryPoint = "DwmGetWindowAttribute")]
+    internal static extern int DwmGetWindowAttributeRect(nint window, int attribute, ref RECT value, int valueSize);
+
     [DllImport("dwmapi.dll")]
     internal static extern int DwmSetWindowAttribute(nint window, int attribute, ref int value, int valueSize);
+
+    [DllImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool DeleteObject(nint graphicsObject);
 
     [DllImport("shell32.dll")]
     internal static extern int SHGetPropertyStoreForWindow(
@@ -180,4 +199,26 @@ internal static class NativeMethods
             ? information.WorkArea
             : new RECT(0, 0, (int)System.Windows.SystemParameters.PrimaryScreenWidth, (int)System.Windows.SystemParameters.PrimaryScreenHeight);
     }
+
+    internal static RECT GetWindowVisualBounds(nint window)
+    {
+        const int extendedFrameBounds = 9;
+        RECT bounds = default;
+        int result = DwmGetWindowAttributeRect(
+            window,
+            extendedFrameBounds,
+            ref bounds,
+            Marshal.SizeOf<RECT>());
+        if (result == 0 && bounds.Width > 0 && bounds.Height > 0)
+        {
+            return bounds;
+        }
+
+        GetWindowRect(window, out bounds);
+        return bounds;
+    }
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool GetWindowRect(nint window, out RECT bounds);
 }

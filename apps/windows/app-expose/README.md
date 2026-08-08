@@ -27,9 +27,16 @@ and choose **Exit** to stop the utility.
 
 The global shortcut records the foreground window, reads the application
 identity Windows assigns to it, and asks Desktop Window Manager for live
-thumbnails of matching top-level windows. Selecting a thumbnail restores and
-activates the original window. No screenshots are saved and no window contents
-leave the machine.
+thumbnails of matching top-level windows. It also keeps a frozen, in-memory
+capture of the desktop behind the overview, then strongly blurs it beneath a
+dark neutral scrim so the real windows are visually hidden. Selecting a thumbnail restores
+and activates the original window. No screenshots are saved and no window
+contents leave the machine.
+
+Each preview begins at its real window bounds, moves into a compact Task View
+row layout over 300 milliseconds, and follows the same path backward when the
+overview closes. The layout scales to the available work area so window contents
+remain readable instead of being held to a small fixed preview height.
 
 App Exposé prefers Windows AppUserModelID so a browser and an installed web app
 do not get mixed together even when they share a process. Older desktop apps

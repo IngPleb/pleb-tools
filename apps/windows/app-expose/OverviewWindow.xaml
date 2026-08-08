@@ -6,50 +6,27 @@
         ResizeMode="NoResize"
         ShowInTaskbar="False"
         Topmost="True"
-        Background="#E6101010"
+        Background="Transparent"
         FontFamily="{StaticResource InterfaceFont}"
-        Foreground="{StaticResource TextPrimary}"
+        Foreground="#FF202020"
         PreviewKeyDown="OnPreviewKeyDown"
         Deactivated="OnDeactivated">
-    <Grid x:Name="Root" Margin="40,28,40,36">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="24" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="24" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+    <Grid x:Name="Root" ClipToBounds="True">
+        <Grid x:Name="BackdropLayer" IsHitTestVisible="False">
+            <Image x:Name="DesktopBackdrop"
+                   Stretch="UniformToFill"
+                   RenderTransformOrigin="0.5,0.5">
+                <Image.Effect>
+                    <BlurEffect Radius="38" KernelType="Gaussian" RenderingBias="Performance" />
+                </Image.Effect>
+                <Image.RenderTransform>
+                    <ScaleTransform ScaleX="1.06" ScaleY="1.06" />
+                </Image.RenderTransform>
+            </Image>
+            <Border Background="#780A0E14" />
+            <Border Background="#24000000" />
+        </Grid>
 
-        <StackPanel HorizontalAlignment="Center">
-            <TextBlock x:Name="AppName"
-                       FontFamily="Segoe UI Variable Display, Segoe UI"
-                       FontSize="20"
-                       FontWeight="SemiBold"
-                       HorizontalAlignment="Center" />
-            <TextBlock x:Name="WindowCount"
-                       Margin="0,4,0,0"
-                       FontSize="12"
-                       Foreground="{StaticResource TextSecondary}"
-                       HorizontalAlignment="Center" />
-        </StackPanel>
-
-        <Grid x:Name="WindowGrid" Grid.Row="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
-
-        <Border Grid.Row="4"
-                Padding="12,7"
-                CornerRadius="8"
-                Background="#B82A2A2A"
-                BorderBrush="#2EFFFFFF"
-                BorderThickness="1"
-                HorizontalAlignment="Center">
-            <TextBlock FontSize="11" Foreground="{StaticResource TextSecondary}">
-                <Run Text="← ↑ ↓ →" Foreground="{StaticResource TextPrimary}" />
-                <Run Text=" select   " />
-                <Run Text="Enter" Foreground="{StaticResource TextPrimary}" />
-                <Run Text=" open   " />
-                <Run Text="Esc" Foreground="{StaticResource TextPrimary}" />
-                <Run Text=" dismiss" />
-            </TextBlock>
-        </Border>
+        <Canvas x:Name="WindowCanvas" />
     </Grid>
 </Window>

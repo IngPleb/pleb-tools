@@ -34,8 +34,8 @@
     {
       "id": "app-expose-native-task-view",
       "scope": "apps/windows/app-expose",
-      "decision": "Use a restrained Windows 11 Task View-like surface with Segoe UI Variable, neutral dark layers, a blue system-style focus ring, and live DWM thumbnails.",
-      "rationale": "The utility should feel native and familiar while preserving clear keyboard focus and avoiding decorative UI that competes with window content."
+      "decision": "Match Windows 11 Task View with a captured and heavily blurred desktop under a dark neutral scrim, light shell cards, compact Segoe UI chrome, blue system focus, and large live DWM thumbnails that animate from each real window location. Omit the virtual-desktop strip and scale one-to-four-window groups to use most of the available work area.",
+      "rationale": "The supplied Task View screenshot is the static composition target, and a native Windows 11 Task View capture establishes a roughly 300 ms ease-out opening transition with a reversed closing path."
     }
   ],
   "evidence": [],
