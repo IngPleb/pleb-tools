@@ -38,8 +38,10 @@ internal sealed class MacKeyboardHook : IDisposable
     private readonly ushort _optionKey;
     private nint _hook;
     private bool _commandDown;
+    private bool _passthroughCommandUntilReleased;
     private bool _mappedControlDown;
     private bool _optionDown;
+    private bool _passthroughOptionUntilReleased;
     private bool _optionForwarded;
     private bool _optionForwardedAsAltGr;
     private bool _optionShortcutUsed;
@@ -61,6 +63,11 @@ internal sealed class MacKeyboardHook : IDisposable
     internal static ushort OptionModifierFor(ushort key) =>
         VirtualKeys.IsPrintable(key) ? VirtualKeys.RightAlt : VirtualKeys.LeftAlt;
 
+    internal static ushort OwnedOptionModifierFor(bool asAltGr, ushort optionKey) =>
+        asAltGr ? VirtualKeys.RightAlt : optionKey;
+
+    internal bool OwnsSyntheticOptionModifier => _optionForwarded;
+
     public MacKeyboardHook(
         ushort commandKey = VirtualKeys.LeftWindows,
         ushort optionKey = VirtualKeys.LeftAlt,
@@ -79,6 +86,10 @@ internal sealed class MacKeyboardHook : IDisposable
             return true;
         }
 
+        RefreshPhysicalModifierState();
+        _passthroughCommandUntilReleased = IsPhysicalKeyDown(_commandKey);
+        _passthroughOptionUntilReleased = IsPhysicalKeyDown(_optionKey);
+        ReleaseStaleOwnedModifiers();
         _hook = NativeMethods.SetWindowsHookEx(LowLevelKeyboardHook, _callback, nint.Zero, 0);
         return _hook != nint.Zero;
     }
@@ -92,6 +103,11 @@ internal sealed class MacKeyboardHook : IDisposable
             NativeMethods.UnhookWindowsHookEx(_hook);
             _hook = nint.Zero;
         }
+
+        // Retry after removing the hook if SendInput was transiently rejected
+        // while the callback chain was active.
+        ReleaseMappedControl();
+        ReleaseForwardedOption();
 
         ResetState();
     }
@@ -122,6 +138,16 @@ internal sealed class MacKeyboardHook : IDisposable
         ushort key = checked((ushort)keyboard.VirtualKey);
         if (key == _commandKey)
         {
+            if (_passthroughCommandUntilReleased)
+            {
+                if (isUp)
+                {
+                    _passthroughCommandUntilReleased = false;
+                }
+
+                return NativeMethods.CallNextHookEx(_hook, code, message, data);
+            }
+
             if (isDown && !_commandDown)
             {
                 _commandDown = true;
@@ -138,6 +164,16 @@ internal sealed class MacKeyboardHook : IDisposable
 
         if (key == _optionKey)
         {
+            if (_passthroughOptionUntilReleased)
+            {
+                if (isUp)
+                {
+                    _passthroughOptionUntilReleased = false;
+                }
+
+                return NativeMethods.CallNextHookEx(_hook, code, message, data);
+            }
+
             if (isDown)
             {
                 if (!_optionDown)
@@ -159,16 +195,23 @@ internal sealed class MacKeyboardHook : IDisposable
                     ReplayOptionPress();
                 }
 
-                bool wasAltGr = _optionForwardedAsAltGr;
-                if (wasAltGr)
+                if (!ReleaseForwardedOption())
                 {
-                    Send([KeyboardStroke.Up(VirtualKeys.RightAlt)]);
+                    // Keep ownership state so the watchdog can retry. The
+                    // physical key-up is still suppressed because its down was.
+                    return 1;
                 }
 
                 ResetOptionState();
-                return wasForwarded && !wasAltGr
-                    ? NativeMethods.CallNextHookEx(_hook, code, message, data)
-                    : 1;
+                return 1;
+            }
+
+            if (isUp)
+            {
+                // Left Alt-down is always suppressed while this hook owns it,
+                // so its physical key-up must never balance a synthetic down.
+                ReleaseForwardedOption();
+                return 1;
             }
         }
 
@@ -296,19 +339,102 @@ internal sealed class MacKeyboardHook : IDisposable
     {
         if (_mappedControlDown)
         {
-            _mappedControlDown = false;
-            Send([KeyboardStroke.Up(VirtualKeys.LeftControl)]);
+            if (_leftControlDown)
+            {
+                // The physical Ctrl key now owns the shared Windows modifier
+                // state and its eventual physical key-up will release it.
+                _mappedControlDown = false;
+                return;
+            }
+
+            if (Send([KeyboardStroke.Up(VirtualKeys.LeftControl)]))
+            {
+                _mappedControlDown = false;
+            }
         }
     }
 
-    private void ReleaseForwardedOption()
+    private bool ReleaseForwardedOption()
     {
-        if (_optionForwarded)
+        if (!_optionForwarded)
         {
-            Send([KeyboardStroke.Up(_optionForwardedAsAltGr ? VirtualKeys.RightAlt : _optionKey)]);
-            ResetOptionState();
+            return true;
+        }
+
+        ushort ownedModifier = OwnedOptionModifierFor(_optionForwardedAsAltGr, _optionKey);
+        if (ownedModifier == VirtualKeys.RightAlt && _rightAltDown)
+        {
+            // Do not release a concurrently held physical AltGr key. Its own
+            // key-up will balance the shared modifier state.
+            _optionForwarded = false;
+            _optionForwardedAsAltGr = false;
+            return true;
+        }
+
+        if (!Send([KeyboardStroke.Up(ownedModifier)]))
+        {
+            return false;
+        }
+
+        _optionForwarded = false;
+        _optionForwardedAsAltGr = false;
+        return true;
+    }
+
+    /// <summary>
+    /// Releases synthetic modifiers if Windows reports that their physical
+    /// source keys are no longer held. This repairs dropped key-up events.
+    /// </summary>
+    internal void RecoverReleasedModifiers(Func<ushort, bool>? isPhysicalKeyDown = null)
+    {
+        isPhysicalKeyDown ??= IsPhysicalKeyDown;
+
+        if (_mappedControlDown && !isPhysicalKeyDown(_commandKey))
+        {
+            _commandDown = false;
+            ReleaseMappedControl();
+        }
+
+        if (_optionDown && !isPhysicalKeyDown(_optionKey))
+        {
+            if (ReleaseForwardedOption())
+            {
+                ResetOptionState();
+            }
         }
     }
+
+    private void ReleaseStaleOwnedModifiers()
+    {
+        var releases = new List<KeyboardStroke>(3);
+        if (!IsPhysicalKeyDown(_commandKey) && !IsPhysicalKeyDown(VirtualKeys.LeftControl))
+        {
+            releases.Add(KeyboardStroke.Up(VirtualKeys.LeftControl));
+        }
+        if (!IsPhysicalKeyDown(_optionKey))
+        {
+            releases.Add(KeyboardStroke.Up(_optionKey));
+            if (!IsPhysicalKeyDown(VirtualKeys.RightAlt))
+            {
+                releases.Add(KeyboardStroke.Up(VirtualKeys.RightAlt));
+            }
+        }
+
+        Send(releases);
+    }
+
+    private void RefreshPhysicalModifierState()
+    {
+        _leftControlDown = IsPhysicalKeyDown(VirtualKeys.LeftControl);
+        _rightControlDown = IsPhysicalKeyDown(VirtualKeys.RightControl);
+        _rightAltDown = IsPhysicalKeyDown(VirtualKeys.RightAlt);
+        _rightWindowsDown = IsPhysicalKeyDown(VirtualKeys.RightWindows);
+        _leftShiftDown = IsPhysicalKeyDown(VirtualKeys.LeftShift);
+        _rightShiftDown = IsPhysicalKeyDown(VirtualKeys.RightShift);
+    }
+
+    private static bool IsPhysicalKeyDown(ushort key) =>
+        (NativeMethods.GetAsyncKeyState(key) & 0x8000) != 0;
 
     private void ReplayOptionPress() =>
         Send([KeyboardStroke.Down(_optionKey), KeyboardStroke.Up(_optionKey)]);
@@ -386,8 +512,10 @@ internal sealed class MacKeyboardHook : IDisposable
     private void ResetState()
     {
         _commandDown = false;
+        _passthroughCommandUntilReleased = false;
         _mappedControlDown = false;
         _optionDown = false;
+        _passthroughOptionUntilReleased = false;
         _optionForwarded = false;
         _optionForwardedAsAltGr = false;
         _optionShortcutUsed = false;

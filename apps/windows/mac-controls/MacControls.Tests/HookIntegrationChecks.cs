@@ -19,6 +19,7 @@ internal static class HookIntegrationChecks
             CheckOptionSelection,
             CheckOptionRightSelection,
             CheckOptionDeletion,
+            CheckLostOptionKeyUpRecovery,
         ];
         foreach (Action<HookHost> check in checks)
         {
@@ -180,6 +181,38 @@ internal static class HookIntegrationChecks
             $"Option+Backspace produced '{state.Text}' at {state.SelectionStart}.");
     }
 
+    private static void CheckLostOptionKeyUpRecovery(HookHost host)
+    {
+        host.Reset(string.Empty, caret: 0);
+        SendStroke(KeyboardStroke.Down(host.OptionKey));
+        SendStroke(KeyboardStroke.Down(0x37));
+        SendStroke(KeyboardStroke.Up(0x37));
+        Assert(host.OwnsSyntheticOptionModifier(),
+            "The hook did not record ownership of its synthetic AltGr modifier.");
+
+        host.RecoverReleasedModifiersUsingWindowsState();
+        Assert(host.OwnsSyntheticOptionModifier(),
+            "Recovery released AltGr while its physical source key was still down.");
+
+        host.RecoverReleasedModifiersForTest();
+        Assert(!host.OwnsSyntheticOptionModifier(),
+            "Recovery did not release the synthetic AltGr modifier after a lost key-up.");
+
+        // Balance the test-only physical F23 state after simulating a dropped
+        // hook notification for its release.
+        SendStroke(KeyboardStroke.Up(host.OptionKey));
+
+        SendStroke(KeyboardStroke.Down(host.OptionKey));
+        SendStroke(KeyboardStroke.Down(0x85));
+        SendStroke(KeyboardStroke.Up(0x85));
+        Assert(host.OwnsSyntheticOptionModifier(),
+            "The hook did not record ownership of its synthetic ordinary Alt modifier.");
+        host.RecoverReleasedModifiersForTest();
+        Assert(!host.OwnsSyntheticOptionModifier(),
+            "Recovery did not release synthetic ordinary Alt after a lost key-up.");
+        SendStroke(KeyboardStroke.Up(host.OptionKey));
+    }
+
     private static void CheckOwnedAltJ(HookHost host)
     {
         host.Reset(string.Empty, caret: 0);
@@ -332,6 +365,15 @@ internal static class HookIntegrationChecks
                     _editor.Focused);
             });
         }
+
+        internal bool OwnsSyntheticOptionModifier() =>
+            Invoke(() => _hook?.OwnsSyntheticOptionModifier ?? false);
+
+        internal void RecoverReleasedModifiersForTest() =>
+            Invoke(() => _hook!.RecoverReleasedModifiers(_ => false));
+
+        internal void RecoverReleasedModifiersUsingWindowsState() =>
+            Invoke(() => _hook!.RecoverReleasedModifiers());
 
         private void RunMessageLoop()
         {

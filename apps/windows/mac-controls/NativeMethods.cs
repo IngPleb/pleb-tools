@@ -78,6 +78,9 @@ internal static class NativeMethods
     internal static extern uint SendInput(uint inputCount, INPUT[] inputs, int inputSize);
 
     [DllImport("user32.dll")]
+    internal static extern short GetAsyncKeyState(int virtualKey);
+
+    [DllImport("user32.dll")]
     internal static extern nint GetForegroundWindow();
 
     [DllImport("user32.dll")]

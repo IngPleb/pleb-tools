@@ -43,6 +43,7 @@ var tests = new (string Name, Action Run)[]
     ("Unrelated PowerToys mappings are accepted", UnrelatedPowerToysMappingsAreAccepted),
     ("Owned personal key mappings are deterministic", OwnedPersonalKeyMappingsAreDeterministic),
     ("Printable Option chords use AltGr", PrintableOptionChordsUseAltGr),
+    ("Synthetic Option releases match their injected modifier", SyntheticOptionReleasesMatchModifier),
 };
 
 int failures = 0;
@@ -232,6 +233,14 @@ static void PrintableOptionChordsUseAltGr()
         "Option+7 did not select the AltGr layer.");
     Assert(MacKeyboardHook.OptionModifierFor(VirtualKeys.Left) == VirtualKeys.LeftAlt,
         "Option+Left was incorrectly classified as an AltGr chord.");
+}
+
+static void SyntheticOptionReleasesMatchModifier()
+{
+    Assert(MacKeyboardHook.OwnedOptionModifierFor(asAltGr: false, VirtualKeys.LeftAlt) == VirtualKeys.LeftAlt,
+        "An ordinary Alt chord would release a different modifier than it pressed.");
+    Assert(MacKeyboardHook.OwnedOptionModifierFor(asAltGr: true, VirtualKeys.LeftAlt) == VirtualKeys.RightAlt,
+        "An AltGr chord would release a different modifier than it pressed.");
 }
 
 static void PowerToysAppSpecificOverlapIsDetected()
