@@ -29,6 +29,29 @@ internal sealed class MacKeyboardHook : IDisposable
         new Dictionary<ushort, string>
         {
             [VirtualKeys.J] = "'",
+            [0x30] = ")",
+            [0x31] = "!",
+            [0x32] = "@",
+            [0x33] = "#",
+            [0x34] = "$",
+            [0x35] = "%",
+            [0x36] = "^",
+            [0x37] = "&",
+            [0x38] = "*",
+            [0x39] = "(",
+            [0x45] = "€",
+            [0xBA] = ";",
+            [0xBB] = "=",
+            [0xBC] = "<",
+            [0xBD] = "-",
+            [0xBE] = ">",
+            [0xBF] = "/",
+            [0xC0] = "`",
+            [0xDB] = "[",
+            [0xDC] = "\\",
+            [0xDD] = "]",
+            [0xDE] = "¤",
+            [0xE2] = "ß",
         };
 
     private readonly NativeMethods.LowLevelKeyboardProc _callback;
@@ -43,7 +66,6 @@ internal sealed class MacKeyboardHook : IDisposable
     private bool _optionDown;
     private bool _passthroughOptionUntilReleased;
     private bool _optionForwarded;
-    private bool _optionForwardedAsAltGr;
     private bool _optionShortcutUsed;
     private bool _rightAltDown;
     private bool _leftControlDown;
@@ -60,11 +82,8 @@ internal sealed class MacKeyboardHook : IDisposable
     internal static ushort RemapOwnedKey(ushort key) =>
         OwnedKeyMappings.TryGetValue(key, out ushort mapped) ? mapped : key;
 
-    internal static ushort OptionModifierFor(ushort key) =>
-        VirtualKeys.IsPrintable(key) ? VirtualKeys.RightAlt : VirtualKeys.LeftAlt;
-
-    internal static ushort OwnedOptionModifierFor(bool asAltGr, ushort optionKey) =>
-        asAltGr ? VirtualKeys.RightAlt : optionKey;
+    internal static bool TryGetOwnedLeftAltText(ushort key, out string text) =>
+        OwnedLeftAltTextShortcuts.TryGetValue(key, out text!);
 
     internal bool OwnsSyntheticOptionModifier => _optionForwarded;
 
@@ -180,7 +199,6 @@ internal sealed class MacKeyboardHook : IDisposable
                 {
                     _optionDown = true;
                     _optionForwarded = false;
-                    _optionForwardedAsAltGr = false;
                     _optionShortcutUsed = false;
                 }
 
@@ -197,8 +215,8 @@ internal sealed class MacKeyboardHook : IDisposable
 
                 if (!ReleaseForwardedOption())
                 {
-                    // Keep ownership state so the watchdog can retry. The
-                    // physical key-up is still suppressed because its down was.
+                    // Keep ownership state so Stop can retry. The physical
+                    // key-up is still suppressed because its down was.
                     return 1;
                 }
 
@@ -236,15 +254,17 @@ internal sealed class MacKeyboardHook : IDisposable
                 return 1;
             }
 
-            if (OptionModifierFor(key) == VirtualKeys.RightAlt)
+            if (VirtualKeys.IsPrintable(key))
             {
-                _optionForwarded = Send([KeyboardStroke.Down(VirtualKeys.RightAlt)]);
-                _optionForwardedAsAltGr = _optionForwarded;
+                // Printable Option chords never hold AltGr. Windows models
+                // AltGr as Ctrl+Alt, which can latch in games. Unmapped keys
+                // are intentionally consumed without creating modifier state.
+                _optionShortcutUsed = true;
+                _suppressedActionKeys.Add(key);
+                return 1;
             }
-            else
-            {
-                _optionForwarded = Send([KeyboardStroke.Down(_optionKey)]);
-            }
+
+            _optionForwarded = Send([KeyboardStroke.Down(_optionKey)]);
         }
 
         ushort remappedKey = RemapOwnedKey(key);
@@ -347,7 +367,7 @@ internal sealed class MacKeyboardHook : IDisposable
                 return;
             }
 
-            if (Send([KeyboardStroke.Up(VirtualKeys.LeftControl)]))
+            if (SendRelease(VirtualKeys.LeftControl))
             {
                 _mappedControlDown = false;
             }
@@ -361,25 +381,17 @@ internal sealed class MacKeyboardHook : IDisposable
             return true;
         }
 
-        ushort ownedModifier = OwnedOptionModifierFor(_optionForwardedAsAltGr, _optionKey);
-        if (ownedModifier == VirtualKeys.RightAlt && _rightAltDown)
-        {
-            // Do not release a concurrently held physical AltGr key. Its own
-            // key-up will balance the shared modifier state.
-            _optionForwarded = false;
-            _optionForwardedAsAltGr = false;
-            return true;
-        }
-
-        if (!Send([KeyboardStroke.Up(ownedModifier)]))
+        if (!SendRelease(_optionKey))
         {
             return false;
         }
 
         _optionForwarded = false;
-        _optionForwardedAsAltGr = false;
         return true;
     }
+
+    private static bool SendRelease(ushort key) =>
+        Send([KeyboardStroke.Up(key)]) || Send([KeyboardStroke.Up(key)]);
 
     private void ReleaseStaleOwnedModifiers()
     {
@@ -420,7 +432,6 @@ internal sealed class MacKeyboardHook : IDisposable
     {
         _optionDown = false;
         _optionForwarded = false;
-        _optionForwardedAsAltGr = false;
         _optionShortcutUsed = false;
     }
 
@@ -494,7 +505,6 @@ internal sealed class MacKeyboardHook : IDisposable
         _optionDown = false;
         _passthroughOptionUntilReleased = false;
         _optionForwarded = false;
-        _optionForwardedAsAltGr = false;
         _optionShortcutUsed = false;
         _rightAltDown = false;
         _leftControlDown = false;

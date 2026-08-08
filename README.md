@@ -10,7 +10,7 @@ usage, and rollback instructions.
 ### [Mac Controls for Windows](apps/windows/mac-controls)
 
 Use physical **Left Win** as a macOS-style Command key and **Left Alt** as an
-Option key for editing controls and the active layout's AltGr symbol layer. The
+Option key for editing controls and a direct Unicode symbol layer. The
 setup also preserves the existing personal Y/Z, layout-key, and Alt+J mappings.
 
 ### [App Exposé](apps/windows/app-expose)

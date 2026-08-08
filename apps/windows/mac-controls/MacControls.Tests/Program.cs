@@ -11,7 +11,7 @@ if (args.Contains("--installed", StringComparer.OrdinalIgnoreCase))
 if (args.Contains("--installed-symbols", StringComparer.OrdinalIgnoreCase))
 {
     HookIntegrationChecks.RunInstalledSymbols();
-    Console.WriteLine("PASS installed Mac Controls owns personal mappings and the AltGr symbol layer");
+    Console.WriteLine("PASS installed Mac Controls owns personal mappings and the Unicode symbol layer");
     return 0;
 }
 
@@ -42,8 +42,8 @@ var tests = new (string Name, Action Run)[]
     ("Malformed PowerToys settings fail closed", MalformedPowerToysSettingsFailClosed),
     ("Unrelated PowerToys mappings are accepted", UnrelatedPowerToysMappingsAreAccepted),
     ("Owned personal key mappings are deterministic", OwnedPersonalKeyMappingsAreDeterministic),
-    ("Printable Option chords use AltGr", PrintableOptionChordsUseAltGr),
-    ("Synthetic Option releases match their injected modifier", SyntheticOptionReleasesMatchModifier),
+    ("Printable Option chords use the owned Unicode symbol map", PrintableOptionChordsUseSymbolMap),
+    ("Unmapped printable Option chords do not create modifiers", UnmappedOptionChordsDoNotCreateModifiers),
 };
 
 int failures = 0;
@@ -227,20 +227,22 @@ static void OwnedPersonalKeyMappingsAreDeterministic()
     Assert(MacKeyboardHook.RemapOwnedKey(0x41) == 0x41, "An unrelated key was remapped.");
 }
 
-static void PrintableOptionChordsUseAltGr()
+static void PrintableOptionChordsUseSymbolMap()
 {
-    Assert(MacKeyboardHook.OptionModifierFor(0x37) == VirtualKeys.RightAlt,
-        "Option+7 did not select the AltGr layer.");
-    Assert(MacKeyboardHook.OptionModifierFor(VirtualKeys.Left) == VirtualKeys.LeftAlt,
-        "Option+Left was incorrectly classified as an AltGr chord.");
+    Assert(MacKeyboardHook.TryGetOwnedLeftAltText(0x37, out string ampersand) && ampersand == "&",
+        "Option+7 did not map to an ampersand.");
+    Assert(MacKeyboardHook.TryGetOwnedLeftAltText(0x32, out string atSign) && atSign == "@",
+        "Option+2 did not map to an at sign.");
+    Assert(MacKeyboardHook.TryGetOwnedLeftAltText(0x45, out string euro) && euro == "€",
+        "Option+E did not map to a euro sign.");
 }
 
-static void SyntheticOptionReleasesMatchModifier()
+static void UnmappedOptionChordsDoNotCreateModifiers()
 {
-    Assert(MacKeyboardHook.OwnedOptionModifierFor(asAltGr: false, VirtualKeys.LeftAlt) == VirtualKeys.LeftAlt,
-        "An ordinary Alt chord would release a different modifier than it pressed.");
-    Assert(MacKeyboardHook.OwnedOptionModifierFor(asAltGr: true, VirtualKeys.LeftAlt) == VirtualKeys.RightAlt,
-        "An AltGr chord would release a different modifier than it pressed.");
+    Assert(!MacKeyboardHook.TryGetOwnedLeftAltText(0x58, out _),
+        "Option+X unexpectedly creates a text or modifier mapping.");
+    Assert(!MacKeyboardHook.TryGetOwnedLeftAltText(VirtualKeys.Z, out _),
+        "Option+Z unexpectedly creates a text or modifier mapping.");
 }
 
 static void PowerToysAppSpecificOverlapIsDetected()

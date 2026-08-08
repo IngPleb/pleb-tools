@@ -15,7 +15,7 @@ runtime dependency.
 | Left Alt + Left / Right | Ctrl + Left / Right | Previous or next word boundary |
 | Left Alt + Up / Down | Ctrl + Up / Down | Previous or next paragraph boundary |
 | Left Alt + Backspace | Ctrl + Backspace | Delete the previous word |
-| Left Alt + printable key | Right Alt/AltGr + key | Type the active layout's symbol layer (`Left Alt + 7` is `&` on Czech QWERTY) |
+| Left Alt + mapped printable key | Unicode text | Type the personal symbol layer (`Left Alt + 7` is `&`) without holding AltGr |
 | Left Alt + J | Unicode text | Insert `'` using the existing personal shortcut |
 | Y / Z | Z / Y | Preserve the existing Y/Z swap |
 | OEM 5 (`VK 220`) | OEM 102 (`VK 226`) | Preserve the existing layout-key remap |
@@ -24,14 +24,16 @@ Hold Shift with any navigation shortcut to extend the selection. Outside these
 editing chords, physical Left Win behaves as Left Ctrl, so familiar macOS-style
 Command+C, Command+V, Command+A, Command+Z, and application shortcuts continue
 to use the normal Windows Ctrl commands. Non-printable Left Alt chords such as
-Alt+Tab remain ordinary Alt shortcuts. Printable Left Alt chords use the active
-Windows layout's AltGr layer. Right Win, physical Right Alt/AltGr, and both
-physical Ctrl keys are unchanged.
+Alt+Tab remain ordinary Alt shortcuts. Mapped printable Left Alt chords emit
+Unicode directly, and unmapped printable chords are consumed without creating
+Alt or Ctrl state. Right Win, physical Right Alt/AltGr, and both physical Ctrl
+keys are unchanged.
 
-This gives access to symbols without reaching for the physical Right Alt key,
-but it intentionally follows the active Windows layout rather than reproducing
-Apple's symbol positions. On the currently installed Czech QWERTY layout,
+This gives access to the Czech QWERTY-derived symbol set without reaching for
+the physical Right Alt key or asking Windows to hold its coupled Ctrl+Alt state.
 Left Alt+7 produces `&`, Left Alt+2 produces `@`, and Left Alt+E produces `€`.
+The mapping is intentionally explicit rather than changing when the active
+Windows input layout changes.
 
 ## Why PowerToys and this app have separate jobs
 
@@ -39,7 +41,7 @@ The inspected PowerToys profile remapped Left Win to Left Ctrl, owned five
 editing shortcuts, swapped Y/Z, remapped one OEM layout key, and inserted an
 apostrophe for Alt+J. PowerToys can express most individual translations, but
 it cannot express the ordered `Shift + Home` then `Backspace` sequence needed
-for Command+Backspace or the combined Option/AltGr policy.
+for Command+Backspace or the combined Option/symbol policy.
 
 Running two keyboard hooks for the same chord makes the result depend on hook
 order. The installer therefore transfers all recognized personal mappings above
@@ -75,7 +77,7 @@ rather than overwrite the original restoration data.
 
 Right-click the tray icon to suspend the keyboard hook, view the shortcut
 reference, or exit. Suspending or exiting also releases any synthetic Ctrl key
-that the app owns, preventing a stuck modifier. Every synthetic Alt/AltGr down
+that the app owns, preventing a stuck modifier. Every synthetic Alt down
 event is paired with a synthetic up event. Startup clears stale owned modifiers
 left behind by an earlier interrupted run without imposing a hold timeout.
 

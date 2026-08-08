@@ -19,7 +19,7 @@ internal static class HookIntegrationChecks
             CheckOptionSelection,
             CheckOptionRightSelection,
             CheckOptionDeletion,
-            CheckHeldOptionReleaseOwnership,
+            CheckPrintableOptionDoesNotOwnModifier,
         ];
         foreach (Action<HookHost> check in checks)
         {
@@ -48,7 +48,8 @@ internal static class HookIntegrationChecks
         RunChecks(host);
         CheckOwnedAltJ(host);
         CheckDelayedOwnedAltJ(host);
-        CheckOptionAltGrSymbol(host);
+        CheckOptionUnicodeSymbol(host);
+        CheckOptionXThenEscapeRemainsNormal(host);
     }
 
     internal static void RunInstalledSymbols()
@@ -66,7 +67,8 @@ internal static class HookIntegrationChecks
 
         CheckOwnedAltJ(host);
         CheckDelayedOwnedAltJ(host);
-        CheckOptionAltGrSymbol(host);
+        CheckOptionUnicodeSymbol(host);
+        CheckOptionXThenEscapeRemainsNormal(host);
     }
 
     private static void RunChecks(HookHost host)
@@ -183,18 +185,18 @@ internal static class HookIntegrationChecks
             $"Option+Backspace produced '{state.Text}' at {state.SelectionStart}.");
     }
 
-    private static void CheckHeldOptionReleaseOwnership(HookHost host)
+    private static void CheckPrintableOptionDoesNotOwnModifier(HookHost host)
     {
         host.Reset(string.Empty, caret: 0);
         SendStroke(KeyboardStroke.Down(host.OptionKey));
         Thread.Sleep(250);
-        SendStroke(KeyboardStroke.Down(0x37));
-        SendStroke(KeyboardStroke.Up(0x37));
-        Assert(host.OwnsSyntheticOptionModifier(),
-            "The hook did not record ownership of its synthetic AltGr modifier.");
+        SendStroke(KeyboardStroke.Down(0x58));
+        SendStroke(KeyboardStroke.Up(0x58));
+        Assert(!host.OwnsSyntheticOptionModifier(),
+            "Option+X created a synthetic modifier.");
         SendStroke(KeyboardStroke.Up(host.OptionKey));
         Assert(!host.OwnsSyntheticOptionModifier(),
-            "The physical Option release did not release the owned synthetic AltGr modifier.");
+            "Option+X retained a synthetic modifier after release.");
 
         SendStroke(KeyboardStroke.Down(host.OptionKey));
         Thread.Sleep(250);
@@ -205,6 +207,17 @@ internal static class HookIntegrationChecks
         SendStroke(KeyboardStroke.Up(host.OptionKey));
         Assert(!host.OwnsSyntheticOptionModifier(),
             "The physical Option release did not release owned synthetic ordinary Alt.");
+    }
+
+    private static void CheckOptionXThenEscapeRemainsNormal(HookHost host)
+    {
+        host.Reset(string.Empty, caret: 0);
+        PressDelayedChord(host.OptionKey, action: 0x58, delayMilliseconds: 350);
+        SendStroke(KeyboardStroke.Down(0x1B));
+        SendStroke(KeyboardStroke.Up(0x1B));
+        EditorState state = host.State();
+        Assert(state.IsForeground && state.IsFocused,
+            "Escape behaved like an Alt shortcut after Option+X was released.");
     }
 
     private static void CheckOwnedAltJ(HookHost host)
@@ -225,7 +238,7 @@ internal static class HookIntegrationChecks
             $"Holding Left Alt before J produced '{state.Text}' instead of an apostrophe.");
     }
 
-    private static void CheckOptionAltGrSymbol(HookHost host)
+    private static void CheckOptionUnicodeSymbol(HookHost host)
     {
         host.Reset(string.Empty, caret: 0);
         PressChord(host.OptionKey, action: 0x37);
