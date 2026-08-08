@@ -19,7 +19,7 @@ internal static class HookIntegrationChecks
             CheckOptionSelection,
             CheckOptionRightSelection,
             CheckOptionDeletion,
-            CheckLostOptionKeyUpRecovery,
+            CheckHeldOptionReleaseOwnership,
         ];
         foreach (Action<HookHost> check in checks)
         {
@@ -47,6 +47,7 @@ internal static class HookIntegrationChecks
 
         RunChecks(host);
         CheckOwnedAltJ(host);
+        CheckDelayedOwnedAltJ(host);
         CheckOptionAltGrSymbol(host);
     }
 
@@ -64,6 +65,7 @@ internal static class HookIntegrationChecks
         host.Start();
 
         CheckOwnedAltJ(host);
+        CheckDelayedOwnedAltJ(host);
         CheckOptionAltGrSymbol(host);
     }
 
@@ -181,36 +183,28 @@ internal static class HookIntegrationChecks
             $"Option+Backspace produced '{state.Text}' at {state.SelectionStart}.");
     }
 
-    private static void CheckLostOptionKeyUpRecovery(HookHost host)
+    private static void CheckHeldOptionReleaseOwnership(HookHost host)
     {
         host.Reset(string.Empty, caret: 0);
         SendStroke(KeyboardStroke.Down(host.OptionKey));
+        Thread.Sleep(250);
         SendStroke(KeyboardStroke.Down(0x37));
         SendStroke(KeyboardStroke.Up(0x37));
         Assert(host.OwnsSyntheticOptionModifier(),
             "The hook did not record ownership of its synthetic AltGr modifier.");
-
-        host.RecoverReleasedModifiersUsingWindowsState();
-        Assert(host.OwnsSyntheticOptionModifier(),
-            "Recovery released AltGr while its physical source key was still down.");
-
-        host.RecoverReleasedModifiersForTest();
-        Assert(!host.OwnsSyntheticOptionModifier(),
-            "Recovery did not release the synthetic AltGr modifier after a lost key-up.");
-
-        // Balance the test-only physical F23 state after simulating a dropped
-        // hook notification for its release.
         SendStroke(KeyboardStroke.Up(host.OptionKey));
+        Assert(!host.OwnsSyntheticOptionModifier(),
+            "The physical Option release did not release the owned synthetic AltGr modifier.");
 
         SendStroke(KeyboardStroke.Down(host.OptionKey));
+        Thread.Sleep(250);
         SendStroke(KeyboardStroke.Down(0x85));
         SendStroke(KeyboardStroke.Up(0x85));
         Assert(host.OwnsSyntheticOptionModifier(),
             "The hook did not record ownership of its synthetic ordinary Alt modifier.");
-        host.RecoverReleasedModifiersForTest();
-        Assert(!host.OwnsSyntheticOptionModifier(),
-            "Recovery did not release synthetic ordinary Alt after a lost key-up.");
         SendStroke(KeyboardStroke.Up(host.OptionKey));
+        Assert(!host.OwnsSyntheticOptionModifier(),
+            "The physical Option release did not release owned synthetic ordinary Alt.");
     }
 
     private static void CheckOwnedAltJ(HookHost host)
@@ -220,6 +214,15 @@ internal static class HookIntegrationChecks
         EditorState state = host.State();
         Assert(state.Text == "'",
             $"The owned Alt+J text mapping produced '{state.Text}'.");
+    }
+
+    private static void CheckDelayedOwnedAltJ(HookHost host)
+    {
+        host.Reset(string.Empty, caret: 0);
+        PressDelayedChord(host.OptionKey, action: 0x4A, delayMilliseconds: 350);
+        EditorState state = host.State();
+        Assert(state.Text == "'",
+            $"Holding Left Alt before J produced '{state.Text}' instead of an apostrophe.");
     }
 
     private static void CheckOptionAltGrSymbol(HookHost host)
@@ -253,6 +256,15 @@ internal static class HookIntegrationChecks
         {
             SendStroke(stroke);
         }
+    }
+
+    private static void PressDelayedChord(ushort modifier, ushort action, int delayMilliseconds)
+    {
+        SendStroke(KeyboardStroke.Down(modifier));
+        Thread.Sleep(delayMilliseconds);
+        SendStroke(KeyboardStroke.Down(action));
+        SendStroke(KeyboardStroke.Up(action));
+        SendStroke(KeyboardStroke.Up(modifier));
     }
 
     private static void SendStroke(KeyboardStroke stroke)
@@ -368,12 +380,6 @@ internal static class HookIntegrationChecks
 
         internal bool OwnsSyntheticOptionModifier() =>
             Invoke(() => _hook?.OwnsSyntheticOptionModifier ?? false);
-
-        internal void RecoverReleasedModifiersForTest() =>
-            Invoke(() => _hook!.RecoverReleasedModifiers(_ => false));
-
-        internal void RecoverReleasedModifiersUsingWindowsState() =>
-            Invoke(() => _hook!.RecoverReleasedModifiers());
 
         private void RunMessageLoop()
         {

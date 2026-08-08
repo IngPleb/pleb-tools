@@ -8,7 +8,6 @@ namespace PlebTools.MacControls;
 internal sealed class MacControlsContext : ApplicationContext
 {
     private readonly MacKeyboardHook _keyboardHook;
-    private readonly System.Windows.Forms.Timer _modifierRecoveryTimer;
     private readonly NotifyIcon _trayIcon;
     private readonly ToolStripMenuItem _enabledItem;
     private bool _enabled = true;
@@ -26,11 +25,6 @@ internal sealed class MacControlsContext : ApplicationContext
         }
 
         _keyboardHook = new MacKeyboardHook();
-        _modifierRecoveryTimer = new System.Windows.Forms.Timer
-        {
-            Interval = 100,
-        };
-        _modifierRecoveryTimer.Tick += (_, _) => _keyboardHook.RecoverReleasedModifiers();
         _enabledItem = new ToolStripMenuItem("Enabled")
         {
             Checked = true,
@@ -59,12 +53,10 @@ internal sealed class MacControlsContext : ApplicationContext
         {
             _trayIcon.Visible = false;
             _trayIcon.Dispose();
-            _modifierRecoveryTimer.Dispose();
             _keyboardHook.Dispose();
             throw new InvalidOperationException(
                 "The global keyboard hook could not be installed. Restart Mac Controls and try again.");
         }
-        _modifierRecoveryTimer.Start();
     }
 
     private void SetEnabled(bool enabled)
@@ -117,7 +109,6 @@ internal sealed class MacControlsContext : ApplicationContext
     protected override void ExitThreadCore()
     {
         _keyboardHook.Dispose();
-        _modifierRecoveryTimer.Dispose();
         _trayIcon.Visible = false;
         _trayIcon.Dispose();
         base.ExitThreadCore();

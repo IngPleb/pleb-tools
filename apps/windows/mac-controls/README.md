@@ -76,9 +76,8 @@ rather than overwrite the original restoration data.
 Right-click the tray icon to suspend the keyboard hook, view the shortcut
 reference, or exit. Suspending or exiting also releases any synthetic Ctrl key
 that the app owns, preventing a stuck modifier. Every synthetic Alt/AltGr down
-event is paired with a synthetic up event; a 100 ms watchdog also releases owned
-modifiers if a game or hook transition drops the physical key-up notification.
-Startup clears stale owned modifiers left behind by an earlier interrupted run.
+event is paired with a synthetic up event. Startup clears stale owned modifiers
+left behind by an earlier interrupted run without imposing a hold timeout.
 
 ## Build and check
 

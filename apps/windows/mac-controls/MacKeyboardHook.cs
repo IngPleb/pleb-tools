@@ -381,29 +381,6 @@ internal sealed class MacKeyboardHook : IDisposable
         return true;
     }
 
-    /// <summary>
-    /// Releases synthetic modifiers if Windows reports that their physical
-    /// source keys are no longer held. This repairs dropped key-up events.
-    /// </summary>
-    internal void RecoverReleasedModifiers(Func<ushort, bool>? isPhysicalKeyDown = null)
-    {
-        isPhysicalKeyDown ??= IsPhysicalKeyDown;
-
-        if (_mappedControlDown && !isPhysicalKeyDown(_commandKey))
-        {
-            _commandDown = false;
-            ReleaseMappedControl();
-        }
-
-        if (_optionDown && !isPhysicalKeyDown(_optionKey))
-        {
-            if (ReleaseForwardedOption())
-            {
-                ResetOptionState();
-            }
-        }
-    }
-
     private void ReleaseStaleOwnedModifiers()
     {
         var releases = new List<KeyboardStroke>(3);
