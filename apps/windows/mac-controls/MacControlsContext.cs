@@ -97,7 +97,8 @@ internal sealed class MacControlsContext : ApplicationContext
             "Left Win + Backspace: delete to start of line\n\n" +
             "Left Alt + arrows: move by word or paragraph\n" +
             "Left Alt + Backspace: delete previous word\n\n" +
-            "Left Alt + printable key: use the personal Unicode symbol layer\n" +
+            "Left Alt + mapped symbol key: use the personal Unicode symbol layer\n" +
+            "Other Left Alt chords: normal Windows Alt shortcuts\n" +
             "Left Alt + J: insert an apostrophe\n\n" +
             "Y/Z and the OEM layout key use the existing personal swaps.\n\n" +
             "Hold Shift with any navigation shortcut to extend the selection.",

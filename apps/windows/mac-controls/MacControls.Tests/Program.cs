@@ -43,7 +43,7 @@ var tests = new (string Name, Action Run)[]
     ("Unrelated PowerToys mappings are accepted", UnrelatedPowerToysMappingsAreAccepted),
     ("Owned personal key mappings are deterministic", OwnedPersonalKeyMappingsAreDeterministic),
     ("Printable Option chords use the owned Unicode symbol map", PrintableOptionChordsUseSymbolMap),
-    ("Unmapped printable Option chords do not create modifiers", UnmappedOptionChordsDoNotCreateModifiers),
+    ("Unmapped printable Option chords remain ordinary shortcuts", UnmappedOptionChordsRemainOrdinaryShortcuts),
 };
 
 int failures = 0;
@@ -237,12 +237,12 @@ static void PrintableOptionChordsUseSymbolMap()
         "Option+E did not map to a euro sign.");
 }
 
-static void UnmappedOptionChordsDoNotCreateModifiers()
+static void UnmappedOptionChordsRemainOrdinaryShortcuts()
 {
     Assert(!MacKeyboardHook.TryGetOwnedLeftAltText(0x58, out _),
-        "Option+X unexpectedly creates a text or modifier mapping.");
+        "Option+X was unexpectedly captured by the Unicode symbol layer.");
     Assert(!MacKeyboardHook.TryGetOwnedLeftAltText(VirtualKeys.Z, out _),
-        "Option+Z unexpectedly creates a text or modifier mapping.");
+        "Option+Z was unexpectedly captured by the Unicode symbol layer.");
 }
 
 static void PowerToysAppSpecificOverlapIsDetected()

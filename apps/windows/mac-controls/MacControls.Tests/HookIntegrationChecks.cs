@@ -19,7 +19,7 @@ internal static class HookIntegrationChecks
             CheckOptionSelection,
             CheckOptionRightSelection,
             CheckOptionDeletion,
-            CheckPrintableOptionDoesNotOwnModifier,
+            CheckOrdinaryPrintableOptionShortcuts,
         ];
         foreach (Action<HookHost> check in checks)
         {
@@ -49,6 +49,7 @@ internal static class HookIntegrationChecks
         CheckOwnedAltJ(host);
         CheckDelayedOwnedAltJ(host);
         CheckOptionUnicodeSymbol(host);
+        CheckOrdinaryPrintableOptionShortcuts(host);
         CheckOptionXThenEscapeRemainsNormal(host);
     }
 
@@ -68,6 +69,7 @@ internal static class HookIntegrationChecks
         CheckOwnedAltJ(host);
         CheckDelayedOwnedAltJ(host);
         CheckOptionUnicodeSymbol(host);
+        CheckOrdinaryPrintableOptionShortcuts(host);
         CheckOptionXThenEscapeRemainsNormal(host);
     }
 
@@ -185,28 +187,19 @@ internal static class HookIntegrationChecks
             $"Option+Backspace produced '{state.Text}' at {state.SelectionStart}.");
     }
 
-    private static void CheckPrintableOptionDoesNotOwnModifier(HookHost host)
+    private static void CheckOrdinaryPrintableOptionShortcuts(HookHost host)
     {
         host.Reset(string.Empty, caret: 0);
-        SendStroke(KeyboardStroke.Down(host.OptionKey));
-        Thread.Sleep(250);
-        SendStroke(KeyboardStroke.Down(0x58));
-        SendStroke(KeyboardStroke.Up(0x58));
-        Assert(!host.OwnsSyntheticOptionModifier(),
-            "Option+X created a synthetic modifier.");
-        SendStroke(KeyboardStroke.Up(host.OptionKey));
-        Assert(!host.OwnsSyntheticOptionModifier(),
-            "Option+X retained a synthetic modifier after release.");
+        PressDelayedChord(host.OptionKey, action: 0x58, delayMilliseconds: 250);
+        Assert(host.LastAltShortcutKey() == Keys.X,
+            $"Windows did not receive Alt+X as an ordinary shortcut; received {host.LastAltShortcutKey()?.ToString() ?? "none"}.");
+        AssertOptionModifiersReleased();
 
-        SendStroke(KeyboardStroke.Down(host.OptionKey));
-        Thread.Sleep(250);
-        SendStroke(KeyboardStroke.Down(0x85));
-        SendStroke(KeyboardStroke.Up(0x85));
-        Assert(host.OwnsSyntheticOptionModifier(),
-            "The hook did not record ownership of its synthetic ordinary Alt modifier.");
-        SendStroke(KeyboardStroke.Up(host.OptionKey));
-        Assert(!host.OwnsSyntheticOptionModifier(),
-            "The physical Option release did not release owned synthetic ordinary Alt.");
+        host.Reset(string.Empty, caret: 0);
+        PressDelayedChord(host.OptionKey, action: VirtualKeys.Z, delayMilliseconds: 250);
+        Assert(host.LastAltShortcutKey() == Keys.Y,
+            $"Windows did not receive physical Alt+Z through the configured Z-to-Y swap; received {host.LastAltShortcutKey()?.ToString() ?? "none"}.");
+        AssertOptionModifiersReleased();
     }
 
     private static void CheckOptionXThenEscapeRemainsNormal(HookHost host)
@@ -218,6 +211,7 @@ internal static class HookIntegrationChecks
         EditorState state = host.State();
         Assert(state.IsForeground && state.IsFocused,
             "Escape behaved like an Alt shortcut after Option+X was released.");
+        AssertOptionModifiersReleased();
     }
 
     private static void CheckOwnedAltJ(HookHost host)
@@ -303,6 +297,22 @@ internal static class HookIntegrationChecks
     private static bool IsExtended(ushort key) => key is
         VirtualKeys.LeftWindows or VirtualKeys.Left or VirtualKeys.Right or VirtualKeys.Up or VirtualKeys.Down;
 
+    private static void AssertOptionModifiersReleased()
+    {
+        ushort[] keys =
+        [
+            VirtualKeys.LeftAlt,
+            VirtualKeys.RightAlt,
+            VirtualKeys.LeftControl,
+            VirtualKeys.RightControl,
+        ];
+        ushort[] held = keys
+            .Where(key => (NativeMethods.GetAsyncKeyState(key) & 0x8000) != 0)
+            .ToArray();
+        Assert(held.Length == 0,
+            $"Option chord left modifier virtual keys held: {string.Join(", ", held.Select(key => $"0x{key:X2}"))}.");
+    }
+
     private static void Assert(bool condition, string message)
     {
         if (!condition)
@@ -329,6 +339,7 @@ internal static class HookIntegrationChecks
         private TextBox? _editor;
         private MacKeyboardHook? _hook;
         private Exception? _startupException;
+        private Keys? _lastAltShortcutKey;
 
         internal HookHost(bool installTestHook, ushort commandKey, ushort optionKey)
         {
@@ -367,9 +378,12 @@ internal static class HookIntegrationChecks
                 _editor!.Text = text;
                 _editor.SelectionStart = caret;
                 _editor.SelectionLength = 0;
+                _lastAltShortcutKey = null;
                 _editor.Focus();
             });
         }
+
+        internal Keys? LastAltShortcutKey() => Invoke(() => _lastAltShortcutKey);
 
         internal EditorState State()
         {
@@ -390,9 +404,6 @@ internal static class HookIntegrationChecks
                     _editor.Focused);
             });
         }
-
-        internal bool OwnsSyntheticOptionModifier() =>
-            Invoke(() => _hook?.OwnsSyntheticOptionModifier ?? false);
 
         private void RunMessageLoop()
         {
@@ -416,6 +427,7 @@ internal static class HookIntegrationChecks
                 using var form = new Form
                 {
                     Text = "Mac Controls integration check",
+                    KeyPreview = true,
                     ShowInTaskbar = false,
                     StartPosition = FormStartPosition.Manual,
                     Location = new Point(-2000, -2000),
@@ -428,6 +440,13 @@ internal static class HookIntegrationChecks
                 };
                 _form = form;
                 _editor = editor;
+                form.KeyDown += (_, eventArgs) =>
+                {
+                    if (eventArgs.Alt)
+                    {
+                        _lastAltShortcutKey = eventArgs.KeyCode;
+                    }
+                };
                 form.Controls.Add(editor);
                 form.Shown += (_, _) =>
                 {

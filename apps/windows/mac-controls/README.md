@@ -16,6 +16,7 @@ runtime dependency.
 | Left Alt + Up / Down | Ctrl + Up / Down | Previous or next paragraph boundary |
 | Left Alt + Backspace | Ctrl + Backspace | Delete the previous word |
 | Left Alt + mapped printable key | Unicode text | Type the personal symbol layer (`Left Alt + 7` is `&`) without holding AltGr |
+| Left Alt + any other key | Left Alt + that key | Preserve ordinary Windows shortcuts such as `Alt+X`, `Alt+Z`, `Alt+Space`, and `Alt+Tab` |
 | Left Alt + J | Unicode text | Insert `'` using the existing personal shortcut |
 | Y / Z | Z / Y | Preserve the existing Y/Z swap |
 | OEM 5 (`VK 220`) | OEM 102 (`VK 226`) | Preserve the existing layout-key remap |
@@ -23,11 +24,10 @@ runtime dependency.
 Hold Shift with any navigation shortcut to extend the selection. Outside these
 editing chords, physical Left Win behaves as Left Ctrl, so familiar macOS-style
 Command+C, Command+V, Command+A, Command+Z, and application shortcuts continue
-to use the normal Windows Ctrl commands. Non-printable Left Alt chords such as
-Alt+Tab remain ordinary Alt shortcuts. Mapped printable Left Alt chords emit
-Unicode directly, and unmapped printable chords are consumed without creating
-Alt or Ctrl state. Right Win, physical Right Alt/AltGr, and both physical Ctrl
-keys are unchanged.
+to use the normal Windows Ctrl commands. Only explicitly mapped printable Left
+Alt chords emit Unicode directly. Every other Left Alt chord, printable or not,
+is delivered as an ordinary Windows Left Alt shortcut. Right Win, physical
+Right Alt/AltGr, and both physical Ctrl keys are unchanged.
 
 This gives access to the Czech QWERTY-derived symbol set without reaching for
 the physical Right Alt key or asking Windows to hold its coupled Ctrl+Alt state.

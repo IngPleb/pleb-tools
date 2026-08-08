@@ -85,8 +85,6 @@ internal sealed class MacKeyboardHook : IDisposable
     internal static bool TryGetOwnedLeftAltText(ushort key, out string text) =>
         OwnedLeftAltTextShortcuts.TryGetValue(key, out text!);
 
-    internal bool OwnsSyntheticOptionModifier => _optionForwarded;
-
     public MacKeyboardHook(
         ushort commandKey = VirtualKeys.LeftWindows,
         ushort optionKey = VirtualKeys.LeftAlt,
@@ -254,17 +252,11 @@ internal sealed class MacKeyboardHook : IDisposable
                 return 1;
             }
 
-            if (VirtualKeys.IsPrintable(key))
-            {
-                // Printable Option chords never hold AltGr. Windows models
-                // AltGr as Ctrl+Alt, which can latch in games. Unmapped keys
-                // are intentionally consumed without creating modifier state.
-                _optionShortcutUsed = true;
-                _suppressedActionKeys.Add(key);
-                return 1;
-            }
-
-            _optionForwarded = Send([KeyboardStroke.Down(_optionKey)]);
+            // Only explicitly owned symbol chords bypass Alt. Every other
+            // chord must remain a normal Windows Left Alt shortcut, including
+            // printable combinations such as Alt+X and Alt+Z. Never forward
+            // Right Alt here: Windows models AltGr as a coupled Ctrl+Alt state.
+            _optionForwarded = Send([KeyboardStroke.Down(VirtualKeys.LeftAlt)]);
         }
 
         ushort remappedKey = RemapOwnedKey(key);
@@ -381,7 +373,7 @@ internal sealed class MacKeyboardHook : IDisposable
             return true;
         }
 
-        if (!SendRelease(_optionKey))
+        if (!SendRelease(VirtualKeys.LeftAlt))
         {
             return false;
         }
@@ -400,9 +392,9 @@ internal sealed class MacKeyboardHook : IDisposable
         {
             releases.Add(KeyboardStroke.Up(VirtualKeys.LeftControl));
         }
-        if (!IsPhysicalKeyDown(_optionKey))
+        if (!IsPhysicalKeyDown(_optionKey) && !IsPhysicalKeyDown(VirtualKeys.LeftAlt))
         {
-            releases.Add(KeyboardStroke.Up(_optionKey));
+            releases.Add(KeyboardStroke.Up(VirtualKeys.LeftAlt));
             if (!IsPhysicalKeyDown(VirtualKeys.RightAlt))
             {
                 releases.Add(KeyboardStroke.Up(VirtualKeys.RightAlt));
@@ -426,7 +418,7 @@ internal sealed class MacKeyboardHook : IDisposable
         (NativeMethods.GetAsyncKeyState(key) & 0x8000) != 0;
 
     private void ReplayOptionPress() =>
-        Send([KeyboardStroke.Down(_optionKey), KeyboardStroke.Up(_optionKey)]);
+        Send([KeyboardStroke.Down(VirtualKeys.LeftAlt), KeyboardStroke.Up(VirtualKeys.LeftAlt)]);
 
     private void ResetOptionState()
     {
