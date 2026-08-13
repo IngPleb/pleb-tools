@@ -10,10 +10,12 @@ internal sealed class MacControlsContext : ApplicationContext
     private readonly MacKeyboardHook _keyboardHook;
     private readonly NotifyIcon _trayIcon;
     private readonly ToolStripMenuItem _enabledItem;
+    private readonly bool _swapLeftWinAlt;
     private bool _enabled = true;
 
-    public MacControlsContext()
+    public MacControlsContext(bool swapLeftWinAlt = false)
     {
+        _swapLeftWinAlt = swapLeftWinAlt;
         PowerToysConflictReport conflicts = PowerToysConflictDetector.Detect();
         if (conflicts.Conflicts.Count > 0)
         {
@@ -24,7 +26,9 @@ internal sealed class MacControlsContext : ApplicationContext
                 "Run install.ps1 -Apply from the Mac Controls folder. It backs up the active PowerToys profile and removes only the overlapping entries.");
         }
 
-        _keyboardHook = new MacKeyboardHook();
+        _keyboardHook = swapLeftWinAlt
+            ? new MacKeyboardHook(commandKey: VirtualKeys.LeftAlt, optionKey: VirtualKeys.LeftWindows)
+            : new MacKeyboardHook();
         _enabledItem = new ToolStripMenuItem("Enabled")
         {
             Checked = true,
@@ -88,18 +92,20 @@ internal sealed class MacControlsContext : ApplicationContext
         _trayIcon.Text = _enabled ? "Mac Controls: enabled" : "Mac Controls: suspended";
     }
 
-    private static void ShowShortcutReference()
+    private void ShowShortcutReference()
     {
+        string commandKey = _swapLeftWinAlt ? "Left Alt" : "Left Win";
+        string optionKey = _swapLeftWinAlt ? "Left Win" : "Left Alt";
         MessageBox.Show(
-            "Left Win behaves like Command (Ctrl for ordinary shortcuts).\n\n" +
-            "Left Win + Left/Right: start/end of line\n" +
-            "Left Win + Up/Down: start/end of document\n" +
-            "Left Win + Backspace: delete to start of line\n\n" +
-            "Left Alt + arrows: move by word or paragraph\n" +
-            "Left Alt + Backspace: delete previous word\n\n" +
-            "Left Alt + mapped symbol key: use the personal Unicode symbol layer\n" +
-            "Other Left Alt chords: normal Windows Alt shortcuts\n" +
-            "Left Alt + J: insert an apostrophe\n\n" +
+            $"{commandKey} behaves like Command (Ctrl for ordinary shortcuts).\n\n" +
+            $"{commandKey} + Left/Right: start/end of line\n" +
+            $"{commandKey} + Up/Down: start/end of document\n" +
+            $"{commandKey} + Backspace: delete to start of line\n\n" +
+            $"{optionKey} + arrows: move by word or paragraph\n" +
+            $"{optionKey} + Backspace: delete previous word\n\n" +
+            $"{optionKey} + mapped symbol key: use the personal Unicode symbol layer\n" +
+            $"Other {optionKey} chords: normal Windows Alt shortcuts\n" +
+            $"{optionKey} + J: insert an apostrophe\n\n" +
             "Y/Z and the OEM layout key use the existing personal swaps.\n\n" +
             "Hold Shift with any navigation shortcut to extend the selection.",
             "Mac Controls shortcuts",

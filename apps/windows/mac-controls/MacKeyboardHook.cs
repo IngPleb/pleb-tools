@@ -17,7 +17,7 @@ internal sealed class MacKeyboardHook : IDisposable
     private const uint ExtendedKey = 0x0001;
     private const uint KeyUpFlag = 0x0002;
     private const uint UnicodeKey = 0x0004;
-    private static readonly nuint ReplayMarker = 0x4D414343;
+    internal static readonly nuint ReplayMarker = 0x4D414343;
     private static readonly IReadOnlyDictionary<ushort, ushort> OwnedKeyMappings =
         new Dictionary<ushort, ushort>
         {
@@ -59,6 +59,7 @@ internal sealed class MacKeyboardHook : IDisposable
     private readonly IReadOnlyDictionary<ushort, string> _leftAltTextShortcuts;
     private readonly ushort _commandKey;
     private readonly ushort _optionKey;
+    private readonly ushort? _copilotKey;
     private nint _hook;
     private bool _commandDown;
     private bool _passthroughCommandUntilReleased;
@@ -71,6 +72,9 @@ internal sealed class MacKeyboardHook : IDisposable
     private bool _leftControlDown;
     private bool _rightControlDown;
     private bool _rightWindowsDown;
+    private bool _copilotKeyDown;
+    private bool _copilotRightWindowsDown;
+    private bool _pendingCopilotShift;
     private bool _leftShiftDown;
     private bool _rightShiftDown;
     private bool _disposed;
@@ -88,11 +92,13 @@ internal sealed class MacKeyboardHook : IDisposable
     public MacKeyboardHook(
         ushort commandKey = VirtualKeys.LeftWindows,
         ushort optionKey = VirtualKeys.LeftAlt,
-        IReadOnlyDictionary<ushort, string>? leftAltTextShortcuts = null)
+        IReadOnlyDictionary<ushort, string>? leftAltTextShortcuts = null,
+        ushort? copilotKey = VirtualKeys.F23)
     {
         _commandKey = commandKey;
         _optionKey = optionKey;
         _leftAltTextShortcuts = leftAltTextShortcuts ?? OwnedLeftAltTextShortcuts;
+        _copilotKey = copilotKey;
         _callback = HandleKeyboardEvent;
     }
 
@@ -113,6 +119,7 @@ internal sealed class MacKeyboardHook : IDisposable
 
     public void Stop()
     {
+        ReleaseCopilotRightWindows();
         ReleaseMappedControl();
         ReleaseForwardedOption();
         if (_hook != nint.Zero)
@@ -123,6 +130,7 @@ internal sealed class MacKeyboardHook : IDisposable
 
         // Retry after removing the hook if SendInput was transiently rejected
         // while the callback chain was active.
+        ReleaseCopilotRightWindows();
         ReleaseMappedControl();
         ReleaseForwardedOption();
 
@@ -174,6 +182,7 @@ internal sealed class MacKeyboardHook : IDisposable
             {
                 _commandDown = false;
                 ReleaseMappedControl();
+                TryReleaseCopilotRightWindows();
             }
 
             return 1;
@@ -219,6 +228,7 @@ internal sealed class MacKeyboardHook : IDisposable
                 }
 
                 ResetOptionState();
+                TryReleaseCopilotRightWindows();
                 return 1;
             }
 
@@ -234,6 +244,55 @@ internal sealed class MacKeyboardHook : IDisposable
         if (isUp && _suppressedActionKeys.Remove(key))
         {
             return 1;
+        }
+
+        if (_copilotKey is not null && key == VirtualKeys.LeftShift)
+        {
+            if (isDown && (_pendingCopilotShift || _copilotKeyDown))
+            {
+                // The Zephyrus repeats the full LWin+LShift+F23 down sequence
+                // while Copilot is held. Keep every repeated Shift-down owned.
+                return 1;
+            }
+
+            if (isDown && !_leftShiftDown && (_commandDown || _optionDown))
+            {
+                _leftShiftDown = true;
+                _pendingCopilotShift = true;
+                return 1;
+            }
+
+            if (isUp && _pendingCopilotShift)
+            {
+                _leftShiftDown = false;
+                _pendingCopilotShift = false;
+                TryReleaseCopilotRightWindows();
+                return 1;
+            }
+        }
+
+        if (_copilotKey is ushort copilotKey && key == copilotKey)
+        {
+            return HandleCopilotKey(isDown, isUp)
+                ? 1
+                : NativeMethods.CallNextHookEx(_hook, code, message, data);
+        }
+
+        if (isDown && _pendingCopilotShift && !_copilotKeyDown)
+        {
+            if (!Send([KeyboardStroke.Down(VirtualKeys.LeftShift)]))
+            {
+                return NativeMethods.CallNextHookEx(_hook, code, message, data);
+            }
+            _pendingCopilotShift = false;
+        }
+
+        if (_copilotKeyDown)
+        {
+            // The macro's leading LWin is still tracked as Command/Option until
+            // its physical key-up arrives. Real keys pressed while Copilot is
+            // held must bypass those layers and travel under synthetic RWin.
+            return NativeMethods.CallNextHookEx(_hook, code, message, data);
         }
 
         UpdatePhysicalModifierState(key, isDown);
@@ -314,6 +373,39 @@ internal sealed class MacKeyboardHook : IDisposable
         return _rightShiftDown ? VirtualKeys.RightShift : null;
     }
 
+    private bool HandleCopilotKey(bool isDown, bool isUp)
+    {
+        if (isDown && !_copilotKeyDown)
+        {
+            _copilotKeyDown = true;
+
+            // This Zephyrus emits LWin + LShift + F23 and repeats all three
+            // key-down events while the physical Copilot key is held. Replace
+            // that entire macro with a held Right Win so Copilot can be used as
+            // a real modifier, including with App Expose's punctuation key.
+            if (_commandDown)
+            {
+                ReleaseMappedControl();
+            }
+            if (_optionDown)
+            {
+                _optionShortcutUsed = true;
+            }
+
+            _copilotRightWindowsDown = Send([KeyboardStroke.Down(VirtualKeys.RightWindows)]);
+            return true;
+        }
+
+        if (isUp)
+        {
+            _copilotKeyDown = false;
+            TryReleaseCopilotRightWindows();
+            return true;
+        }
+
+        return true;
+    }
+
     private void UpdatePhysicalModifierState(ushort key, bool isDown)
     {
         switch (key)
@@ -380,6 +472,29 @@ internal sealed class MacKeyboardHook : IDisposable
 
         _optionForwarded = false;
         return true;
+    }
+
+    private void ReleaseCopilotRightWindows()
+    {
+        if (!_copilotRightWindowsDown)
+        {
+            return;
+        }
+
+        if (SendRelease(VirtualKeys.RightWindows))
+        {
+            _copilotRightWindowsDown = false;
+        }
+    }
+
+    private void TryReleaseCopilotRightWindows()
+    {
+        if (_copilotKeyDown || _commandDown || _optionDown || _pendingCopilotShift)
+        {
+            return;
+        }
+
+        ReleaseCopilotRightWindows();
     }
 
     private static bool SendRelease(ushort key) =>
@@ -484,7 +599,8 @@ internal sealed class MacKeyboardHook : IDisposable
 
     private static bool IsExtendedKey(ushort key) => key is
         VirtualKeys.Home or VirtualKeys.End or VirtualKeys.Left or VirtualKeys.Right or
-        VirtualKeys.Up or VirtualKeys.Down or VirtualKeys.RightControl or VirtualKeys.RightAlt;
+        VirtualKeys.Up or VirtualKeys.Down or VirtualKeys.RightControl or VirtualKeys.RightAlt or
+        VirtualKeys.LeftWindows or VirtualKeys.RightWindows;
 
     private static bool IsShiftKey(ushort key) => key is
         VirtualKeys.Shift or VirtualKeys.LeftShift or VirtualKeys.RightShift;
@@ -502,6 +618,9 @@ internal sealed class MacKeyboardHook : IDisposable
         _leftControlDown = false;
         _rightControlDown = false;
         _rightWindowsDown = false;
+        _copilotKeyDown = false;
+        _copilotRightWindowsDown = false;
+        _pendingCopilotShift = false;
         _leftShiftDown = false;
         _rightShiftDown = false;
         _suppressedActionKeys.Clear();

@@ -3,6 +3,8 @@ param(
     [ValidateSet('Install', 'Uninstall')]
     [string]$Action = 'Install',
     [switch]$Apply,
+    [ValidateSet('Standard', 'Swapped')]
+    [string]$ModifierLayout,
     [string]$KeyboardManagerDirectory = (Join-Path $env:LOCALAPPDATA 'Microsoft\PowerToys\Keyboard Manager')
 )
 
@@ -17,12 +19,24 @@ $receiptPath = Join-Path $stateRoot 'install-receipt.json'
 $runKeyPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 $runValueName = 'PlebToolsMacControls'
 
+$effectiveModifierLayout = if ($PSBoundParameters.ContainsKey('ModifierLayout')) {
+    $ModifierLayout
+}
+elseif (Test-Path -LiteralPath $receiptPath) {
+    $existingLayoutReceipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
+    if ([string]$existingLayoutReceipt.modifierLayout -eq 'LeftAltCommand') { 'Swapped' } else { 'Standard' }
+}
+else {
+    'Standard'
+}
+
 $ownedKeyMappings = @(
     @{ Source = '91'; Target = '162'; Description = 'Left Win -> Left Ctrl' },
     @{ Source = '89'; Target = '90'; Description = 'Y -> Z' },
     @{ Source = '90'; Target = '89'; Description = 'Z -> Y' },
     @{ Source = '220'; Target = '226'; Description = 'OEM 5 -> OEM 102' }
 )
+$allOwnedKeySources = @($ownedKeyMappings.Source) + @('164')
 $ownedShortcutMappings = @(
     @{ Source = '164;8'; Target = '163;8'; Description = 'Left Alt + Backspace -> Right Ctrl + Backspace' },
     @{ Source = '164;37'; Target = '163;37'; Description = 'Left Alt + Left -> Right Ctrl + Left' },
@@ -64,7 +78,7 @@ function Get-PowerToysChangeSet {
         $expected = @($ownedKeyMappings | Where-Object {
             $_.Source -eq $source -and $_.Target -eq $target
         })
-        $source -in @($ownedKeyMappings.Source) -and $expected.Count -eq 0
+        $source -in $allOwnedKeySources -and $expected.Count -eq 0
     })
     $unexpectedShortcuts = @($shortcutMappings | Where-Object {
         $source = [string]$_.originalKeys
@@ -127,14 +141,23 @@ function Write-JsonAtomic {
     )
 
     $temporaryPath = "$Path.mac-controls.tmp"
+    $replacementBackupPath = "$Path.mac-controls.replace-backup"
     $json = $Value | ConvertTo-Json -Depth 100 -Compress
     [IO.File]::WriteAllText($temporaryPath, $json, [Text.UTF8Encoding]::new($false))
     try {
-        [IO.File]::Move($temporaryPath, $Path, $true)
+        if (Test-Path -LiteralPath $Path) {
+            [IO.File]::Replace($temporaryPath, $Path, $replacementBackupPath)
+        }
+        else {
+            [IO.File]::Move($temporaryPath, $Path)
+        }
     }
     finally {
         if (Test-Path -LiteralPath $temporaryPath) {
             Remove-Item -LiteralPath $temporaryPath -Force
+        }
+        if (Test-Path -LiteralPath $replacementBackupPath) {
+            Remove-Item -LiteralPath $replacementBackupPath -Force
         }
     }
 }
@@ -226,6 +249,7 @@ function Preview-Install {
     Write-Output 'Mac Controls install preview'
     Write-Output "  Application: $installRoot"
     Write-Output "  Startup: HKCU Run value $runValueName"
+    Write-Output ("  Modifier layout: " + $(if ($effectiveModifierLayout -eq 'Swapped') { 'physical Left Alt = Command, physical Left Win = Option' } else { 'physical Left Win = Command, physical Left Alt = Option' }))
     if ([string]::IsNullOrWhiteSpace($ProfilePath)) {
         Write-Output '  PowerToys: no Keyboard Manager profile found'
     }
@@ -265,11 +289,20 @@ function Install-MacControls {
     $profileChanged = $false
     $profileBackupPath = $null
     $previousInstallMoved = $false
+    $applicationStopped = $false
+    $newInstallCreated = $false
     $existingRunValue = Get-ExistingRunValue
     $existingReceiptText = $null
     $readyEvent = $null
     if (Test-Path -LiteralPath $receiptPath) {
         $existingReceiptText = Get-Content -LiteralPath $receiptPath -Raw
+    }
+    $previousApplicationArguments = if ($null -ne $existingReceiptText -and
+        [string](($existingReceiptText | ConvertFrom-Json).modifierLayout) -eq 'LeftAltCommand') {
+        @('--swap-left-win-alt')
+    }
+    else {
+        @()
     }
 
     New-Item -ItemType Directory -Path $publishRoot -Force | Out-Null
@@ -280,6 +313,7 @@ function Install-MacControls {
         }
 
         Stop-MacControls
+        $applicationStopped = $true
         if (Test-Path -LiteralPath $installRoot) {
             if (Test-Path -LiteralPath $previousInstallRoot) {
                 Remove-Item -LiteralPath $previousInstallRoot -Recurse -Force
@@ -288,6 +322,7 @@ function Install-MacControls {
             $previousInstallMoved = $true
         }
         New-Item -ItemType Directory -Path $installRoot -Force | Out-Null
+        $newInstallCreated = $true
         Copy-Item -Path (Join-Path $publishRoot '*') -Destination $installRoot -Recurse -Force
 
         New-Item -ItemType Directory -Path $stateRoot -Force | Out-Null
@@ -306,7 +341,7 @@ function Install-MacControls {
         }
 
         $receipt = [ordered]@{
-            schemaVersion = 2
+            schemaVersion = 3
             installedAt = if ($null -ne $existingReceipt) { [string]$existingReceipt.installedAt } else { [DateTimeOffset]::Now.ToString('o') }
             updatedAt = [DateTimeOffset]::Now.ToString('o')
             profilePath = if ($null -ne $existingReceipt -and -not [string]::IsNullOrWhiteSpace([string]$existingReceipt.profilePath)) {
@@ -318,6 +353,7 @@ function Install-MacControls {
             backupPath = if ($null -ne $existingReceipt) { [string]$existingReceipt.backupPath } else { $null }
             originalProfileSha256 = if ($null -ne $existingReceipt) { [string]$existingReceipt.originalProfileSha256 } else { $null }
             installedProfileSha256 = $null
+            modifierLayout = if ($effectiveModifierLayout -eq 'Swapped') { 'LeftAltCommand' } else { 'LeftWinCommand' }
             removedKeys = if ($null -ne $existingReceipt) { @($existingReceipt.removedKeys) } else { @() }
             removedShortcuts = if ($null -ne $existingReceipt) { @($existingReceipt.removedShortcuts) } else { @() }
             removedTextMappings = if ($null -ne $existingReceipt -and $existingReceipt.PSObject.Properties.Name -contains 'removedTextMappings') {
@@ -358,13 +394,16 @@ function Install-MacControls {
             [Text.UTF8Encoding]::new($false))
 
         $executablePath = Join-Path $installRoot 'MacControls.exe'
-        New-ItemProperty -Path $runKeyPath -Name $runValueName -PropertyType String -Value ('"{0}"' -f $executablePath) -Force | Out-Null
+        [string[]]$applicationArguments = if ($effectiveModifierLayout -eq 'Swapped') { @('--swap-left-win-alt') } else { @() }
+        $runValue = '"{0}"{1}' -f $executablePath, $(if ($effectiveModifierLayout -eq 'Swapped') { ' --swap-left-win-alt' } else { '' })
+        New-ItemProperty -Path $runKeyPath -Name $runValueName -PropertyType String -Value $runValue -Force | Out-Null
         $readyEventName = "PlebTools.MacControls.Setup.$PID.$([Guid]::NewGuid().ToString('N'))"
         $readyEvent = [Threading.EventWaitHandle]::new(
             $false,
             [Threading.EventResetMode]::AutoReset,
             $readyEventName)
-        $startedApplication = Start-Process -FilePath $executablePath -ArgumentList @('--ready-event', $readyEventName) -WindowStyle Hidden -PassThru
+        $applicationArguments += @('--ready-event', $readyEventName)
+        $startedApplication = Start-Process -FilePath $executablePath -ArgumentList $applicationArguments -WindowStyle Hidden -PassThru
         if (-not $readyEvent.WaitOne([TimeSpan]::FromSeconds(5))) {
             throw 'Mac Controls did not confirm that its tray and keyboard hook started successfully.'
         }
@@ -384,37 +423,39 @@ function Install-MacControls {
         Write-Output "Mac Controls installed and started from $installRoot"
     }
     catch {
-        Stop-MacControls
-        if ($null -ne $existingRunValue) {
-            New-ItemProperty -Path $runKeyPath -Name $runValueName -PropertyType String -Value $existingRunValue -Force | Out-Null
-        }
-        else {
-            Remove-ItemProperty -Path $runKeyPath -Name $runValueName -ErrorAction SilentlyContinue
-        }
+        if ($applicationStopped) {
+            Stop-MacControls
+            if ($null -ne $existingRunValue) {
+                New-ItemProperty -Path $runKeyPath -Name $runValueName -PropertyType String -Value $existingRunValue -Force | Out-Null
+            }
+            else {
+                Remove-ItemProperty -Path $runKeyPath -Name $runValueName -ErrorAction SilentlyContinue
+            }
 
-        if ($profileChanged -and @(Get-PowerToysProcesses).Count -gt 0) {
-            Stop-PowerToys
-            $powerToysStopped = $true
-        }
-        if ($profileChanged -and $null -ne $profileBackupPath -and (Test-Path -LiteralPath $profileBackupPath)) {
-            Copy-Item -LiteralPath $profileBackupPath -Destination $profilePath -Force
-        }
+            if ($profileChanged -and @(Get-PowerToysProcesses).Count -gt 0) {
+                Stop-PowerToys
+                $powerToysStopped = $true
+            }
+            if ($profileChanged -and $null -ne $profileBackupPath -and (Test-Path -LiteralPath $profileBackupPath)) {
+                Copy-Item -LiteralPath $profileBackupPath -Destination $profilePath -Force
+            }
 
-        if ($null -ne $existingReceiptText) {
-            [IO.File]::WriteAllText($receiptPath, $existingReceiptText, [Text.UTF8Encoding]::new($false))
-        }
-        elseif (Test-Path -LiteralPath $receiptPath) {
-            Remove-Item -LiteralPath $receiptPath -Force
-        }
+            if ($null -ne $existingReceiptText) {
+                [IO.File]::WriteAllText($receiptPath, $existingReceiptText, [Text.UTF8Encoding]::new($false))
+            }
+            elseif (Test-Path -LiteralPath $receiptPath) {
+                Remove-Item -LiteralPath $receiptPath -Force
+            }
 
-        if ($previousInstallMoved -and (Test-Path -LiteralPath $previousInstallRoot)) {
-            if (Test-Path -LiteralPath $installRoot) {
+            if ($newInstallCreated -and (Test-Path -LiteralPath $installRoot)) {
                 Remove-Item -LiteralPath $installRoot -Recurse -Force
             }
-            Move-Item -LiteralPath $previousInstallRoot -Destination $installRoot
-            $previousInstallMoved = $false
+            if ($previousInstallMoved -and (Test-Path -LiteralPath $previousInstallRoot)) {
+                Move-Item -LiteralPath $previousInstallRoot -Destination $installRoot
+                $previousInstallMoved = $false
+            }
             if ($macControlsWasRunning) {
-                Start-Process -FilePath (Join-Path $installRoot 'MacControls.exe') -WindowStyle Hidden
+                Start-Process -FilePath (Join-Path $installRoot 'MacControls.exe') -ArgumentList $previousApplicationArguments -WindowStyle Hidden
             }
         }
 

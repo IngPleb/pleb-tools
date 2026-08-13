@@ -1,6 +1,18 @@
 [CmdletBinding()]
-param([switch]$Apply)
+param(
+    [switch]$Apply,
+    [ValidateSet('Standard', 'Swapped')]
+    [string]$ModifierLayout
+)
 
-& (Join-Path $PSScriptRoot 'setup.ps1') -Action Install -Apply:$Apply
+$setupArguments = @{
+    Action = 'Install'
+    Apply = $Apply
+}
+if ($PSBoundParameters.ContainsKey('ModifierLayout')) {
+    $setupArguments.ModifierLayout = $ModifierLayout
+}
+
+& (Join-Path $PSScriptRoot 'setup.ps1') @setupArguments
 if (-not $?) { exit 1 }
 exit 0

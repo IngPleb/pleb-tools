@@ -24,7 +24,8 @@ internal static class Program
 
         try
         {
-            var context = new MacControlsContext();
+            bool swapLeftWinAlt = args.Contains("--swap-left-win-alt", StringComparer.OrdinalIgnoreCase);
+            var context = new MacControlsContext(swapLeftWinAlt);
             SignalReady(args);
             Application.Run(context);
         }

@@ -1,7 +1,7 @@
 # Mac Controls for Windows
 
 Mac Controls brings the fundamental macOS text-editing model to Windows while
-preserving normal Windows behavior everywhere else. It is a small native .NET 9
+preserving normal Windows behavior everywhere else. It is a small native .NET 10
 notification-area utility with no network access, service, or third-party
 runtime dependency.
 
@@ -20,6 +20,7 @@ runtime dependency.
 | Left Alt + J | Unicode text | Insert `'` using the existing personal shortcut |
 | Y / Z | Z / Y | Preserve the existing Y/Z swap |
 | OEM 5 (`VK 220`) | OEM 102 (`VK 226`) | Preserve the existing layout-key remap |
+| Copilot key (`Left Win + Left Shift + F23` repeating OEM macro) | Held Right Win | Use the dedicated Copilot key as a real Right Win modifier without leaking its macro keys |
 
 Hold Shift with any navigation shortcut to extend the selection. Outside these
 editing chords, physical Left Win behaves as Left Ctrl, so familiar macOS-style
@@ -28,6 +29,14 @@ to use the normal Windows Ctrl commands. Only explicitly mapped printable Left
 Alt chords emit Unicode directly. Every other Left Alt chord, printable or not,
 is delivered as an ordinary Windows Left Alt shortcut. Right Win, physical
 Right Alt/AltGr, and both physical Ctrl keys are unchanged.
+
+The Copilot mapping is based on a raw capture from this Zephyrus: the firmware
+repeats the complete `Left Win + Left Shift + F23` key-down sequence while the
+button is held. Mac Controls suppresses those macro events, holds Right Win from
+the first F23-down until the final macro modifier-up, and balances the synthetic
+key on shutdown. It never synthesizes a Shift release. A Copilot tap therefore
+remains an ordinary clean Right Win tap, while held chords use Right Win as a
+real modifier.
 
 This gives access to the Czech QWERTY-derived symbol set without reaching for
 the physical Right Alt key or asking Windows to hold its coupled Ctrl+Alt state.
@@ -51,7 +60,7 @@ refuses to start if it detects that one of its owned mappings still exists.
 ## Preview and install
 
 Requirements for installation from source: Windows 11 and the
-[.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0).
+[.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
 
 Open PowerShell in this folder:
 
@@ -59,6 +68,19 @@ Open PowerShell in this folder:
 .\install.ps1
 .\install.ps1 -Apply
 ```
+
+On a keyboard where the physical Alt key occupies the macOS Command position,
+preview and install the swapped left-modifier layout with:
+
+```powershell
+.\install.ps1 -ModifierLayout Swapped
+.\install.ps1 -Apply -ModifierLayout Swapped
+```
+
+In this layout, physical Left Alt is Command and physical Left Win is Option.
+Right Win remains a native Windows key. Re-running the installer without a
+layout argument preserves the installed layout; pass `-ModifierLayout Standard`
+to switch back explicitly.
 
 The first command is read-only. It identifies the active PowerToys profile and
 reports exactly how many entries will move. `-Apply` then:

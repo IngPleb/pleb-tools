@@ -3,14 +3,37 @@ using PlebTools.MacControls;
 
 if (args.Contains("--installed", StringComparer.OrdinalIgnoreCase))
 {
-    HookIntegrationChecks.RunInstalled();
+    bool swappedModifierLayout = args.Contains("--swapped-layout", StringComparer.OrdinalIgnoreCase);
+    HookIntegrationChecks.RunInstalled(swappedModifierLayout);
     Console.WriteLine("PASS installed Mac Controls edits a real Windows text control");
+    return 0;
+}
+
+if (args.Contains("--installed-copilot", StringComparer.OrdinalIgnoreCase))
+{
+    HookIntegrationChecks.RunInstalledCopilot();
+    Console.WriteLine("PASS installed Mac Controls maps the Copilot macro to held Right Win");
+    return 0;
+}
+
+if (args.Contains("--installed-app-expose", StringComparer.OrdinalIgnoreCase))
+{
+    HookIntegrationChecks.RunInstalledAppExpose();
+    Console.WriteLine("PASS Copilot tap acts as Right Win and its measured chord activates installed App Expose");
+    return 0;
+}
+
+if (args.Contains("--copilot-integration", StringComparer.OrdinalIgnoreCase))
+{
+    HookIntegrationChecks.RunCopilot();
+    Console.WriteLine("PASS repeating Copilot macro maps to a balanced held Right Win");
     return 0;
 }
 
 if (args.Contains("--installed-symbols", StringComparer.OrdinalIgnoreCase))
 {
-    HookIntegrationChecks.RunInstalledSymbols();
+    bool swappedModifierLayout = args.Contains("--swapped-layout", StringComparer.OrdinalIgnoreCase);
+    HookIntegrationChecks.RunInstalledSymbols(swappedModifierLayout);
     Console.WriteLine("PASS installed Mac Controls owns personal mappings and the Unicode symbol layer");
     return 0;
 }
@@ -193,11 +216,14 @@ static void PowerToysOverlapIsDetected()
     WithPowerToysConfiguration(
         """
         {
-          "remapKeys": {"inProcess": [{"originalKeys": "91", "newRemapKeys": "162"}]},
+          "remapKeys": {"inProcess": [
+            {"originalKeys": "91", "newRemapKeys": "162"},
+            {"originalKeys": "164", "newRemapKeys": "91"}
+          ]},
           "remapShortcuts": {"global": [{"originalKeys": "164;37", "newRemapKeys": "163;37"}]}
         }
         """,
-        report => Assert(report.Conflicts.Count == 2, $"Expected 2 conflicts, got {report.Conflicts.Count}."));
+        report => Assert(report.Conflicts.Count == 3, $"Expected 3 conflicts, got {report.Conflicts.Count}."));
 }
 
 static void UnrelatedPowerToysMappingsAreAccepted()

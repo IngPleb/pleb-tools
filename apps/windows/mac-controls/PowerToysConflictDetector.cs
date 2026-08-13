@@ -27,7 +27,7 @@ internal static class PowerToysConflictDetector
         "164;39",
         "164;40",
     ];
-    private static readonly HashSet<string> OwnedKeySources = ["89", "90", "91", "220"];
+    private static readonly HashSet<string> OwnedKeySources = ["89", "90", "91", "164", "220"];
     private static readonly HashSet<string> OwnedTextShortcutSources = ["18;74", "164;74"];
 
     internal static PowerToysConflictReport Detect()

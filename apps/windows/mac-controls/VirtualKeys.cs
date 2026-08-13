@@ -20,6 +20,8 @@ internal static class VirtualKeys
     internal const ushort RightAlt = 0xA5;
     internal const ushort LeftWindows = 0x5B;
     internal const ushort RightWindows = 0x5C;
+    internal const ushort F21 = 0x84;
+    internal const ushort F22 = 0x85;
     internal const ushort F23 = 0x86;
     internal const ushort F24 = 0x87;
 
