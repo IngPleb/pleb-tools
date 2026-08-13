@@ -7,14 +7,28 @@ macOS App Exposé.
 
 ## Use it
 
-Requirements: Windows 11 and the [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0).
+Requirements: Windows 11 and the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
 
-1. Double-click `run.cmd`. It builds and starts the app; a small icon remains in
-   the notification area.
-2. Focus an application with multiple windows.
-3. Press **Right Windows + -**. The main-row, numpad, and detected
+For a temporary source-tree run, double-click `run.cmd`. For a normal per-user
+installation, open PowerShell in this folder:
+
+```powershell
+.\install.ps1
+.\install.ps1 -Apply
+```
+
+The first command is read-only. `-Apply` publishes the app under
+`%LOCALAPPDATA%\PlebTools\AppExpose`, registers it for current-user startup,
+starts it, and waits for the tray icon and shortcut hook to report healthy.
+Installation and upgrades restore the previous binaries and startup entry if
+startup verification fails.
+
+After the app starts:
+
+1. Focus an application with multiple windows.
+2. Press **Right Windows + -**. The main-row, numpad, and detected
    layout-specific minus keys are supported.
-4. Use the arrow keys or Tab to select a live preview, then press Enter. You can
+3. Use the arrow keys or Tab to select a live preview, then press Enter. You can
    also click a preview. Escape or clicking elsewhere dismisses the overview.
 
 The left Windows key is not part of this binding. Right Windows by itself and
@@ -59,6 +73,13 @@ dotnet run --project .\AppExpose.Tests\AppExpose.Tests.csproj --configuration Re
 
 ## Rollback
 
-Right-click the notification-area icon and choose **Exit**, then delete this
-folder. App Exposé does not add startup entries, services, registry values, or
-scheduled tasks.
+Preview and apply removal with:
+
+```powershell
+.\uninstall.ps1
+.\uninstall.ps1 -Apply
+```
+
+Uninstall stops App Exposé and removes its current-user startup entry and
+installed files. Its audit receipt remains under
+`%LOCALAPPDATA%\PlebTools\AppExposeState`. No service or scheduled task is used.

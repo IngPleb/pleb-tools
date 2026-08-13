@@ -31,6 +31,7 @@ public partial class App : System.Windows.Application
         try
         {
             _controller = new AppController();
+            SignalReady(e.Args);
         }
         catch (Exception exception)
         {
@@ -40,6 +41,25 @@ public partial class App : System.Windows.Application
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
             Shutdown(1);
+        }
+    }
+
+    private static void SignalReady(string[] args)
+    {
+        int optionIndex = Array.IndexOf(args, "--ready-event");
+        if (optionIndex < 0 || optionIndex + 1 >= args.Length)
+        {
+            return;
+        }
+
+        try
+        {
+            using EventWaitHandle readyEvent = EventWaitHandle.OpenExisting(args[optionIndex + 1]);
+            readyEvent.Set();
+        }
+        catch (WaitHandleCannotBeOpenedException)
+        {
+            // The installer may have exited while the application was starting.
         }
     }
 

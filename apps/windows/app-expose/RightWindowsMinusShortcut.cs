@@ -92,8 +92,7 @@ internal sealed class RightWindowsMinusShortcut : IDisposable
             return NativeMethods.CallNextHookEx(_hook, code, message, data);
         }
 
-        bool isMinus = keyboard.VirtualKey is MinusKey or NumpadSubtractKey ||
-            keyboard.ScanCode is MainRowMinusScanCode or NumpadMinusScanCode or LayoutMinusScanCode;
+        bool isMinus = IsMinusKey(keyboard.VirtualKey, keyboard.ScanCode);
         if (isMinus)
         {
             if (isDown)
@@ -124,6 +123,10 @@ internal sealed class RightWindowsMinusShortcut : IDisposable
 
         return NativeMethods.CallNextHookEx(_hook, code, message, data);
     }
+
+    internal static bool IsMinusKey(uint virtualKey, uint scanCode) =>
+        virtualKey is MinusKey or NumpadSubtractKey ||
+        scanCode is MainRowMinusScanCode or NumpadMinusScanCode or LayoutMinusScanCode;
 
     private static void ReplayRightWindowsPress()
     {

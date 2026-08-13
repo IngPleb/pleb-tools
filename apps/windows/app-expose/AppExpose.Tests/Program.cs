@@ -28,6 +28,14 @@ if (WindowGridLayout.Calculate(0, 1920, 1080) != (0, 0))
 
 Console.WriteLine($"PASS: {cases.Length + 1} App Exposé layout checks");
 
+if (!RightWindowsMinusShortcut.IsMinusKey(virtualKey: 0xBF, scanCode: 0x35))
+{
+    Console.Error.WriteLine("FAIL: the notebook's measured punctuation key was not recognized as App Expose minus");
+    return 1;
+}
+
+Console.WriteLine("PASS: measured VK 0xBF / scan 0x035 activates the App Expose shortcut");
+
 var taskViewCases = new[]
 {
     (Aspects: new[] { 16d / 9d }, ExpectedRows: 1),
